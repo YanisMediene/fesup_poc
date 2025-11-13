@@ -1,16 +1,12 @@
-services:
+databases:
   # ============================================
   # Base de données PostgreSQL
   # ============================================
-  - type: pserv
-    name: fesup-postgres
+  - name: fesup-postgres
     plan: free
     region: frankfurt
 
-  # ============================================
-  # Backend Spring Boot
-  # ============================================
-  - type: web
+services:
     name: fesup-backend
     env: docker
     plan: free
