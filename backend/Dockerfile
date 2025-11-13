@@ -1,39 +1,62 @@
-# Stage 1: Build avec Maven
-FROM maven:3.9.5-eclipse-temurin-17-alpine AS builder
+# ============================================
+# EPIC-6 : Dockerfile Backend (Spring Boot)
+# Multi-stage build pour optimiser la taille
+# ============================================
+
+# ========== STAGE 1 : BUILD ==========
+FROM maven:3.9-eclipse-temurin-17 AS build
+
+# Définir le répertoire de travail
 WORKDIR /app
 
-# Copier pom.xml et télécharger dépendances (optimisation cache Docker)
+# Copier les fichiers de configuration Maven
 COPY pom.xml .
+
+# Télécharger les dépendances (mise en cache si pom.xml n'a pas changé)
 RUN mvn dependency:go-offline -B
 
-# Copier sources et compiler
+# Copier le code source
 COPY src ./src
-RUN mvn clean package -DskipTests -B
 
-# Stage 2: Runtime léger
+# Compiler et packager l'application (skip tests pour accélérer le build)
+RUN mvn clean package -DskipTests
+
+# ========== STAGE 2 : RUNTIME ==========
 FROM eclipse-temurin:17-jre-alpine
+
+# Métadonnées de l'image
+LABEL maintainer="fesup-team"
+LABEL description="FESUP Backend - Spring Boot Application"
+LABEL version="1.0.0"
+
+# Créer un utilisateur non-root pour la sécurité
+RUN addgroup -S spring && adduser -S spring -G spring
+
+# Définir le répertoire de travail
 WORKDIR /app
 
-# Installer curl pour health checks
-RUN apk add --no-cache curl
+# Créer le dossier pour les tickets PDF
+RUN mkdir -p /app/tickets && chown -R spring:spring /app
 
-# Copier JAR compilé
-COPY --from=builder /app/target/fesup-voeux-backend-1.0.0-SNAPSHOT.jar /app/app.jar
+# Copier le JAR depuis l'étape de build
+COPY --from=build /app/target/*.jar app.jar
 
-# Créer utilisateur non-root (sécurité)
-RUN addgroup -g 1001 -S spring && \
-    adduser -u 1001 -S spring -G spring
+# Changer le propriétaire
+RUN chown -R spring:spring /app
+
+# Passer à l'utilisateur non-root
 USER spring:spring
 
-# Port dynamique Render
+# Exposer le port 8080
 EXPOSE 8080
 
-# Variables JVM optimisées pour 512MB RAM gratuit
-ENV JAVA_OPTS="-Xmx450m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0 -XX:+ExitOnOutOfMemoryError"
+# Variables d'environnement par défaut (seront override par docker-compose)
+ENV SPRING_PROFILES_ACTIVE=prod
+ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:${PORT:-8080}/api/actuator/health || exit 1
+# Point de santé (healthcheck)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
 
 # Commande de démarrage
-CMD ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT:-8080} -Dspring.profiles.active=prod -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

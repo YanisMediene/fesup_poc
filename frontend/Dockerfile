@@ -1,66 +1,49 @@
-# Stage 1: Build Angular
-FROM node:18-alpine AS builder
+# ============================================
+# EPIC-6 : Dockerfile Frontend (Angular 17)
+# Multi-stage build avec Nginx
+# ============================================
+
+# ========== STAGE 1 : BUILD ==========
+FROM node:18-alpine AS build
+
+# Définir le répertoire de travail
 WORKDIR /app
 
-# Installer dépendances
+# Copier les fichiers de dépendances
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps --quiet
 
-# Copier sources et compiler en mode production
+# Installer les dépendances
+RUN npm ci --legacy-peer-deps
+
+# Copier le code source
 COPY . .
+
+# Build de l'application Angular en mode production
 RUN npm run build -- --configuration production
 
-# Stage 2: NGINX Runtime
+# ========== STAGE 2 : RUNTIME ==========
 FROM nginx:1.25-alpine
-WORKDIR /usr/share/nginx/html
 
-# Copier le build Angular
-COPY --from=builder /app/dist/frontend/browser ./
+# Métadonnées de l'image
+LABEL maintainer="fesup-team"
+LABEL description="FESUP Frontend - Angular Application with Nginx"
+LABEL version="1.0.0"
 
-# Copier configuration NGINX template
-COPY nginx.conf /etc/nginx/nginx.conf.template
+# Supprimer la configuration Nginx par défaut
+RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/default.conf
 
-# Installer gettext pour envsubst (substitution variables)
-RUN apk add --no-cache gettext
+# Copier les fichiers buildés depuis l'étape de build
+COPY --from=build /app/dist/fesup-voeux-frontend /usr/share/nginx/html
 
-# Script de démarrage pour injecter variables Render
-RUN cat > /docker-entrypoint.sh << 'EOF'
-#!/bin/sh
-set -e
+# Copier la configuration Nginx personnalisée
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-echo "🚀 Starting NGINX with Render configuration..."
+# Exposer le port 80
+EXPOSE 80
 
-# Définir PORT par défaut si non défini
-export PORT=${PORT:-10000}
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
 
-# Définir BACKEND_URL par défaut si non défini
-if [ -z "$BACKEND_URL" ]; then
-    echo "⚠️  BACKEND_URL not set, using default"
-    export BACKEND_URL="http://localhost:8080"
-fi
-
-echo "📝 Configuration:"
-echo "   PORT: $PORT"
-echo "   BACKEND_URL: $BACKEND_URL"
-
-# Remplacer variables dans nginx.conf
-envsubst '${PORT} ${BACKEND_URL}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
-
-# Tester configuration NGINX
-nginx -t
-
-# Démarrer NGINX
-echo "✅ Starting NGINX..."
-exec nginx -g 'daemon off;'
-EOF
-
-RUN chmod +x /docker-entrypoint.sh
-
-# Expose port dynamique Render (10000 par défaut)
-EXPOSE ${PORT:-10000}
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
-  CMD wget --quiet --tries=1 --spider http://localhost:${PORT:-10000}/health || exit 1
-
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Démarrer Nginx (au premier plan)
+CMD ["nginx", "-g", "daemon off;"]

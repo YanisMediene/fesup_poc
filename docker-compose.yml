@@ -98,11 +98,6 @@ services:
       backend:
         condition: service_healthy
     
-    environment:
-      # Variables pour le nouveau Dockerfile (compatible Render)
-      PORT: 80
-      BACKEND_URL: http://backend:8080
-    
     ports:
       # Exposer le port 80 pour accéder à l'application via http://localhost
       - "80:80"
@@ -111,7 +106,7 @@ services:
       - fesup-network
     
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -132,3 +127,4 @@ networks:
   fesup-network:
     driver: bridge
     name: fesup-network
+# ============================================
