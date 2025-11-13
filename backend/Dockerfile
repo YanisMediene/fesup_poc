@@ -1,65 +1,39 @@
-# ============================================
-# EPIC-6 : Dockerfile Backend (Spring Boot)
-# Multi-stage build optimisé pour Render.com
-# ============================================
-
-# ========== STAGE 1 : BUILD ==========
-FROM maven:3.9-eclipse-temurin-17-alpine AS build
-
-# Définir le répertoire de travail
+# Stage 1: Build avec Maven
+FROM maven:3.9.5-eclipse-temurin-17-alpine AS builder
 WORKDIR /app
 
-# Copier les fichiers de configuration Maven
+# Copier pom.xml et télécharger dépendances (optimisation cache Docker)
 COPY pom.xml .
-
-# Télécharger les dépendances (mise en cache si pom.xml n'a pas changé)
 RUN mvn dependency:go-offline -B
 
-# Copier le code source
+# Copier sources et compiler
 COPY src ./src
-
-# Compiler et packager l'application (skip tests pour accélérer le build)
 RUN mvn clean package -DskipTests -B
 
-# ========== STAGE 2 : RUNTIME ==========
+# Stage 2: Runtime léger
 FROM eclipse-temurin:17-jre-alpine
-
-# Métadonnées de l'image
-LABEL maintainer="fesup-team"
-LABEL description="FESUP Backend - Spring Boot Application (Render.com compatible)"
-LABEL version="1.0.0"
-
-# Installer curl pour healthchecks Render
-RUN apk add --no-cache curl
-
-# Créer un utilisateur non-root pour la sécurité
-RUN addgroup -S spring && adduser -S spring -G spring
-
-# Définir le répertoire de travail
 WORKDIR /app
 
-# Créer le dossier pour les tickets PDF
-RUN mkdir -p /app/tickets && chown -R spring:spring /app
+# Installer curl pour health checks
+RUN apk add --no-cache curl
 
-# Copier le JAR depuis l'étape de build
-COPY --from=build /app/target/*.jar app.jar
+# Copier JAR compilé
+COPY --from=builder /app/target/fesup-voeux-backend-1.0.0-SNAPSHOT.jar /app/app.jar
 
-# Changer le propriétaire
-RUN chown -R spring:spring /app
-
-# Passer à l'utilisateur non-root
+# Créer utilisateur non-root (sécurité)
+RUN addgroup -g 1001 -S spring && \
+    adduser -u 1001 -S spring -G spring
 USER spring:spring
 
-# Exposer le port (dynamique pour Render)
-EXPOSE ${PORT:-8080}
+# Port dynamique Render
+EXPOSE 8080
 
-# Variables d'environnement par défaut (override par Render/docker-compose)
-ENV SPRING_PROFILES_ACTIVE=prod
+# Variables JVM optimisées pour 512MB RAM gratuit
 ENV JAVA_OPTS="-Xmx450m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0 -XX:+ExitOnOutOfMemoryError"
 
-# Point de santé (healthcheck avec support PORT dynamique)
+# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:${PORT:-8080}/api/actuator/health || exit 1
 
-# Commande de démarrage (support PORT dynamique pour Render)
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT:-8080} -Dspring.profiles.active=prod -jar app.jar"]
+# Commande de démarrage
+CMD ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT:-8080} -Dspring.profiles.active=prod -jar app.jar"]

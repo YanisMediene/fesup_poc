@@ -1,20 +1,19 @@
-databases:
-  # ============================================
-  # Base de données PostgreSQL
-  # ============================================
-  - name: fesup-postgres
-    plan: free
-    region: frankfurt
-
 services:
-  # ============================================
+  # Base de données PostgreSQL
+  - type: pserv
+    name: fesup-postgres
+    plan: free
+    env: docker
+    databases:
+      - name: fesup_db
+        databaseName: fesup_db
+        user: fesup_user
+
   # Backend Spring Boot
-  # ============================================
   - type: web
     name: fesup-backend
     env: docker
     plan: free
-    region: frankfurt
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     envVars:
@@ -25,20 +24,15 @@ services:
           name: fesup-postgres
           property: connectionString
       - key: JAVA_OPTS
-        value: "-Xmx450m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0"
-      - key: APPLICATION_TICKETS_STORAGE_PATH
-        value: /app/tickets
+        value: "-Xmx512m -Xms256m"
     healthCheckPath: /api/actuator/health
     autoDeploy: true
 
-  # ============================================
   # Frontend Angular + NGINX
-  # ============================================
   - type: web
     name: fesup-frontend
     env: docker
     plan: free
-    region: frankfurt
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
     envVars:
