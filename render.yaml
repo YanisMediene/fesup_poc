@@ -6,8 +6,6 @@ services:
     name: fesup-postgres
     plan: free
     region: frankfurt
-    databaseName: fesup_db
-    databaseUser: fesup_user
     ipAllowList: []
 
   # ============================================
