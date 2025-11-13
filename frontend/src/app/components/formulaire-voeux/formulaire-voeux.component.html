@@ -1,0 +1,144 @@
+<div class="container">
+  <div class="card-large">
+    <h2>Formulaire de vœux</h2>
+    
+    <!-- Bandeau infos élève -->
+    <div class="bandeau-eleve" *ngIf="eleve">
+      <span>👤 {{ eleve.prenom }} {{ eleve.nom }}</span>
+      <span>🏫 {{ eleve.lycee }}</span>
+      <span class="badge">⏰ {{ eleve.demiJournee }}</span>
+    </div>
+    
+    <!-- Loader -->
+    <div class="loader" *ngIf="isLoading">
+      Chargement des activités...
+    </div>
+    
+    <!-- Affichage des erreurs de validation -->
+    <div *ngIf="erreurs.length > 0" class="alert-erreur">
+      <ul>
+        <li *ngFor="let erreur of erreurs">{{ erreur }}</li>
+      </ul>
+    </div>
+    
+    <form [formGroup]="formulaire" *ngIf="!isLoading && activites">
+      
+      <!-- SECTION VŒUX 1 ET 2 -->
+      <div class="section-voeux">
+        <h3>📌 Vos 2 premiers vœux (Conférences uniquement)</h3>
+        <p class="info">Choisissez 2 conférences différentes parmi les 19 disponibles</p>
+        
+        <div class="form-group">
+          <label for="voeu1">Vœu n°1 - Conférence *</label>
+          <select id="voeu1" formControlName="conferenceVoeu1" class="select-input">
+            <option [value]="null">-- Choisissez une conférence --</option>
+            <option *ngFor="let conf of activites.conferences" [value]="conf.id">
+              {{ conf.titre }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="voeu2">Vœu n°2 - Conférence *</label>
+          <select id="voeu2" formControlName="conferenceVoeu2" class="select-input">
+            <option [value]="null">-- Choisissez une conférence --</option>
+            <option *ngFor="let conf of activites.conferences" [value]="conf.id">
+              {{ conf.titre }}
+            </option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- SECTION VŒUX 3-4-5 -->
+      <div class="section-voeux">
+        <h3>📌 Vos 3 vœux suivants</h3>
+        <p class="info">
+          Vous pouvez choisir parmi les 17 conférences restantes, 
+          les {{ activites.tablesRondes.length }} tables rondes ou 
+          les {{ activites.flashsMetiers.length }} flashs métiers
+        </p>
+        
+        <div class="form-group">
+          <label for="voeu3">Vœu n°3 *</label>
+          <select id="voeu3" formControlName="activiteVoeu3" class="select-input">
+            <option [value]="null">-- Choisissez une activité --</option>
+            <optgroup label="Conférences">
+              <option *ngFor="let conf of activites.conferences" [value]="conf.id">
+                {{ conf.titre }}
+              </option>
+            </optgroup>
+            <optgroup label="Tables rondes">
+              <option *ngFor="let tr of activites.tablesRondes" [value]="tr.id">
+                {{ tr.titre }}
+              </option>
+            </optgroup>
+            <optgroup label="Flashs métiers">
+              <option *ngFor="let fm of activites.flashsMetiers" [value]="fm.id">
+                {{ fm.titre }}
+              </option>
+            </optgroup>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="voeu4">Vœu n°4 *</label>
+          <select id="voeu4" formControlName="activiteVoeu4" class="select-input">
+            <option [value]="null">-- Choisissez une activité --</option>
+            <optgroup label="Conférences">
+              <option *ngFor="let conf of activites.conferences" [value]="conf.id">
+                {{ conf.titre }}
+              </option>
+            </optgroup>
+            <optgroup label="Tables rondes">
+              <option *ngFor="let tr of activites.tablesRondes" [value]="tr.id">
+                {{ tr.titre }}
+              </option>
+            </optgroup>
+            <optgroup label="Flashs métiers">
+              <option *ngFor="let fm of activites.flashsMetiers" [value]="fm.id">
+                {{ fm.titre }}
+              </option>
+            </optgroup>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="voeu5">Vœu n°5 *</label>
+          <select id="voeu5" formControlName="activiteVoeu5" class="select-input">
+            <option [value]="null">-- Choisissez une activité --</option>
+            <optgroup label="Conférences">
+              <option *ngFor="let conf of activites.conferences" [value]="conf.id">
+                {{ conf.titre }}
+              </option>
+            </optgroup>
+            <optgroup label="Tables rondes">
+              <option *ngFor="let tr of activites.tablesRondes" [value]="tr.id">
+                {{ tr.titre }}
+              </option>
+            </optgroup>
+            <optgroup label="Flashs métiers">
+              <option *ngFor="let fm of activites.flashsMetiers" [value]="fm.id">
+                {{ fm.titre }}
+              </option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+      
+      <!-- ACTIONS -->
+      <div class="actions">
+        <button type="button" (click)="retour()" class="btn-secondary" [disabled]="isSubmitting">
+          ← Retour
+        </button>
+        <button 
+          type="button" 
+          (click)="soumettre()" 
+          [disabled]="formulaire.invalid || isSubmitting" 
+          class="btn-primary">
+          <span *ngIf="!isSubmitting">Soumettre mes vœux ✓</span>
+          <span *ngIf="isSubmitting">Soumission en cours...</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

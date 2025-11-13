@@ -1,0 +1,5 @@
+nom,prenom,idNational,lycee,ville,codePostal,demiJournee
+DUPONT,Jean,120890177FA,Lycée Victor Hugo,Paris,75001,JOUR1_MATIN
+MARTIN,Sophie,120113325CK,Lycée Voltaire,Paris,75011,JOUR1_APRES_MIDI
+BERNARD,Lucas,120502256GJ,Lycée Descartes,Lyon,69001,JOUR2_MATIN
+PETIT,Emma,120845741GA,Lycée Molière,Marseille,13001,JOUR2_APRES_MIDI

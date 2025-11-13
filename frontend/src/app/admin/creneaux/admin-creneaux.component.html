@@ -1,0 +1,222 @@
+<div class="creneaux-container">
+  <div class="header">
+    <button class="btn-back" routerLink="/admin/dashboard">
+      <span class="icon">←</span> Retour
+    </button>
+    <h1>⏰ Gestion des Créneaux</h1>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- Messages -->
+  <div class="alert alert-success" *ngIf="successMessage">
+    ✅ {{ successMessage }}
+  </div>
+  <div class="alert alert-error" *ngIf="errorMessage">
+    ❌ {{ errorMessage }}
+  </div>
+
+  <!-- Statistiques -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">📋</div>
+      <div class="stat-value">{{ creneaux.length }}</div>
+      <div class="stat-label">Total créneaux</div>
+    </div>
+    <div class="stat-card info">
+      <div class="stat-icon">☀️</div>
+      <div class="stat-value">{{ countMatin }}</div>
+      <div class="stat-label">Matin</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-icon">🌙</div>
+      <div class="stat-value">{{ countApresMidi }}</div>
+      <div class="stat-label">Après-midi</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-icon">📅</div>
+      <div class="stat-value">{{ filteredCreneaux.length }}</div>
+      <div class="stat-label">Affichés</div>
+    </div>
+  </div>
+
+  <!-- Actions principales -->
+  <div class="actions-bar">
+    <button class="btn btn-primary" (click)="openNewForm()">
+      <span class="icon">➕</span> Nouveau Créneau
+    </button>
+    <label class="btn btn-info" [class.loading]="importing">
+      <span class="icon">📤</span> Importer CSV
+      <input type="file" accept=".csv" (change)="onFileSelected($event)" style="display: none;">
+    </label>
+    <button class="btn btn-danger" (click)="deleteAllCreneaux()" [disabled]="deleting || creneaux.length === 0">
+      <span class="icon">🗑️</span> Supprimer Tout
+    </button>
+  </div>
+
+  <!-- Import CSV - Résultats -->
+  <div class="import-result" *ngIf="importResult">
+    <h3>Résultat de l'import</h3>
+    <p><strong>{{ importResult.success }}</strong> créneaux importés sur <strong>{{ importResult.total }}</strong> lignes traitées.</p>
+    <div *ngIf="importResult.errors.length > 0" class="import-errors">
+      <h4>⚠️ Erreurs :</h4>
+      <ul>
+        <li *ngFor="let error of importResult.errors">{{ error }}</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Bouton pour importer -->
+  <div class="import-section" *ngIf="selectedFile">
+    <div class="file-selected">
+      <span class="icon">📄</span>
+      <span>{{ selectedFile.name }}</span>
+      <button class="btn btn-success btn-sm" (click)="importCsv()" [disabled]="importing">
+        {{ importing ? 'Import en cours...' : 'Lancer l\'import' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Filtres et recherche -->
+  <div class="filters-bar">
+    <div class="filter-buttons">
+      <button 
+        class="filter-btn" 
+        [class.active]="filterDemiJournee === ''"
+        (click)="filterDemiJournee = ''; applyFilters()">
+        Tous ({{ creneaux.length }})
+      </button>
+      <button 
+        *ngFor="let option of demiJourneeOptions"
+        class="filter-btn" 
+        [class.active]="filterDemiJournee === option.value"
+        (click)="filterDemiJournee = option.value; applyFilters()">
+        {{ option.label }} ({{ countByDemiJournee(option.value) }})
+      </button>
+    </div>
+    <div class="search-box">
+      <input 
+        type="text" 
+        placeholder="🔍 Rechercher..." 
+        [(ngModel)]="searchText"
+        (input)="applyFilters()">
+    </div>
+  </div>
+
+  <!-- Formulaire (Modal) -->
+  <div class="modal-overlay" *ngIf="showForm" (click)="closeForm()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>{{ isEditing ? 'Modifier' : 'Nouveau' }} Créneau</h2>
+        <button class="btn-close" (click)="closeForm()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form (ngSubmit)="saveCreneau()">
+          <div class="form-group">
+            <label>Libellé *</label>
+            <input 
+              type="text" 
+              class="form-control"
+              [(ngModel)]="currentCreneau.libelle"
+              name="libelle"
+              placeholder="Ex: Créneau 1 - J1 Matin"
+              required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Heure de début *</label>
+              <input 
+                type="time" 
+                class="form-control"
+                [(ngModel)]="currentCreneau.heureDebut"
+                name="heureDebut"
+                required>
+            </div>
+            <div class="form-group">
+              <label>Heure de fin *</label>
+              <input 
+                type="time" 
+                class="form-control"
+                [(ngModel)]="currentCreneau.heureFin"
+                name="heureFin"
+                required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Demi-journée *</label>
+            <select 
+              class="form-control"
+              [(ngModel)]="currentCreneau.demiJournee"
+              name="demiJournee"
+              required>
+              <option *ngFor="let option of demiJourneeOptions" [value]="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" (click)="closeForm()">
+              Annuler
+            </button>
+            <button type="submit" class="btn btn-primary">
+              {{ isEditing ? 'Modifier' : 'Créer' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liste des créneaux groupés par demi-journée -->
+  <div class="creneaux-list" *ngIf="!loading; else loadingTemplate">
+    <div *ngIf="filteredCreneaux.length === 0" class="empty-state">
+      <div class="empty-icon">📭</div>
+      <h3>Aucun créneau trouvé</h3>
+      <p>Créez votre premier créneau ou importez-en depuis un fichier CSV.</p>
+      <button class="btn btn-primary" (click)="openNewForm()">
+        ➕ Créer un créneau
+      </button>
+    </div>
+
+    <div *ngFor="let entry of getCreneauxByDemiJournee() | keyvalue" class="demi-journee-group">
+      <h2 class="demi-journee-title">
+        {{ getDemiJourneeLabel(entry.key) }}
+        <span class="badge">{{ entry.value.length }}</span>
+      </h2>
+      
+      <div class="creneaux-cards">
+        <div *ngFor="let creneau of entry.value" class="creneau-card">
+          <div class="creneau-header">
+            <h3>{{ creneau.libelle }}</h3>
+            <div class="creneau-actions">
+              <button class="btn-icon btn-edit" (click)="editCreneau(creneau)" title="Modifier">
+                ✏️
+              </button>
+              <button class="btn-icon btn-delete" (click)="deleteCreneau(creneau.id!)" title="Supprimer">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div class="creneau-body">
+            <div class="creneau-time">
+              <span class="icon">🕐</span>
+              <strong>{{ creneau.heureDebut }}</strong> - <strong>{{ creneau.heureFin }}</strong>
+            </div>
+            <div class="creneau-badge">
+              {{ getDemiJourneeLabel(creneau.demiJournee) }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ng-template #loadingTemplate>
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Chargement des créneaux...</p>
+    </div>
+  </ng-template>
+</div>

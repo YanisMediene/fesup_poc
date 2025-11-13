@@ -1,0 +1,31 @@
+titre,description,type,demiJournee,capaciteMax
+"Etudes et métiers des arts, de la culture et du design","Conférence sur etudes et métiers des arts, de la culture et du design",CONFERENCE,JOUR1_MATIN,40
+Etudes et métiers du commerce,Conférence sur etudes et métiers du commerce,CONFERENCE,JOUR1_APRES_MIDI,40
+Les études médicales,Conférence sur les études médicales,CONFERENCE,JOUR2_MATIN,40
+Management économie gestion Licences CPGE,Conférence sur management économie gestion licences cpge,CONFERENCE,JOUR2_APRES_MIDI,40
+Sciences et innovations technologiques BTS BUT,Conférence sur sciences et innovations technologiques bts but,CONFERENCE,JOUR1_MATIN,40
+"Sociologie, sciences de l’éducation, histoire géographie Licences CPGE","Conférence sur sociologie, sciences de l’éducation, histoire géographie licences cpge",CONFERENCE,JOUR1_APRES_MIDI,40
+Etudes et métiers de l’informatique et du numérique,Conférence sur etudes et métiers de l’informatique et du numérique,CONFERENCE,JOUR2_MATIN,40
+Etudes et métiers du droit - Science Po,Conférence sur etudes et métiers du droit - science po,CONFERENCE,JOUR2_APRES_MIDI,40
+Etudes et métiers du soin et de la santé,Conférence sur etudes et métiers du soin et de la santé,CONFERENCE,JOUR1_MATIN,40
+Etudes et métiers du tourisme et de l’hôtellerie BTS,Conférence sur etudes et métiers du tourisme et de l’hôtellerie bts,CONFERENCE,JOUR1_APRES_MIDI,40
+Etudes et métiers de lhabitat et de la construction,Conférence sur etudes et métiers de lhabitat et de la construction,CONFERENCE,JOUR2_MATIN,40
+Sciences et techniques Licence CPGE,Conférence sur sciences et techniques licence cpge,CONFERENCE,JOUR2_APRES_MIDI,40
+Etudes et métiers de l’ingénieur,Conférence sur etudes et métiers de l’ingénieur,CONFERENCE,JOUR1_MATIN,40
+"Etudes et métiers du management, économie, gestion (BTS/BUT)","Conférence sur etudes et métiers du management, économie, gestion (bts/but)",CONFERENCE,JOUR1_APRES_MIDI,40
+Etudes et métiers du secteur social,Conférence sur etudes et métiers du secteur social,CONFERENCE,JOUR2_MATIN,40
+Etudes et métiers du sport,Conférence sur etudes et métiers du sport,CONFERENCE,JOUR2_APRES_MIDI,40
+Lettres et langues Licences CPGE,Conférence sur lettres et langues licences cpge,CONFERENCE,JOUR1_MATIN,40
+"Sciences de la vie, de l’environnement et de l’agronomie BTS BUT","Conférence sur sciences de la vie, de l’environnement et de l’agronomie bts but",CONFERENCE,JOUR1_APRES_MIDI,40
+Etre étudiant _ Parcoursup,Conférence sur etre étudiant _ parcoursup,CONFERENCE,JOUR2_MATIN,40
+Etre étudiant en BTS,Table ronde : Etre étudiant en BTS,TABLE_RONDE,JOUR2_APRES_MIDI,25
+Etre étudiant en BUT,Table ronde : Etre étudiant en BUT,TABLE_RONDE,JOUR1_MATIN,25
+Etre étudiant en prépa CPI ou CPGE,Table ronde : Etre étudiant en prépa CPI ou CPGE,TABLE_RONDE,JOUR1_APRES_MIDI,25
+Etre alternant dans lenseignement supérieur,Table ronde : Etre alternant dans lenseignement supérieur,TABLE_RONDE,JOUR2_MATIN,25
+Etre étudiant en Licences,Table ronde : Etre étudiant en Licences,TABLE_RONDE,JOUR2_APRES_MIDI,25
+Ingénieur,Flash métier présentant le métier de ingénieur,FLASH_METIER,JOUR1_MATIN,20
+Social,Flash métier présentant le métier de social,FLASH_METIER,JOUR1_APRES_MIDI,20
+Commerce,Flash métier présentant le métier de commerce,FLASH_METIER,JOUR2_MATIN,20
+Sport,Flash métier présentant le métier de sport,FLASH_METIER,JOUR2_APRES_MIDI,20
+Paramédical,Flash métier présentant le métier de paramédical,FLASH_METIER,JOUR1_MATIN,20
+Design / architecture,Flash métier présentant le métier de design / architecture,FLASH_METIER,JOUR1_APRES_MIDI,20

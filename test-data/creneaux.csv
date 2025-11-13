@@ -1,0 +1,17 @@
+libelle,heureDebut,heureFin,demiJournee
+Créneau 1 - J1 Matin,08:30,09:30,JOUR1_MATIN
+Créneau 2 - J1 Matin,09:45,10:45,JOUR1_MATIN
+Créneau 3 - J1 Matin,11:00,12:00,JOUR1_MATIN
+Créneau 4 - J1 Matin,12:15,13:15,JOUR1_MATIN
+Créneau 1 - J1 Après-midi,14:00,15:00,JOUR1_APRES_MIDI
+Créneau 2 - J1 Après-midi,15:15,16:15,JOUR1_APRES_MIDI
+Créneau 3 - J1 Après-midi,16:30,17:30,JOUR1_APRES_MIDI
+Créneau 4 - J1 Après-midi,17:45,18:45,JOUR1_APRES_MIDI
+Créneau 1 - J2 Matin,08:30,09:30,JOUR2_MATIN
+Créneau 2 - J2 Matin,09:45,10:45,JOUR2_MATIN
+Créneau 3 - J2 Matin,11:00,12:00,JOUR2_MATIN
+Créneau 4 - J2 Matin,12:15,13:15,JOUR2_MATIN
+Créneau 1 - J2 Après-midi,14:00,15:00,JOUR2_APRES_MIDI
+Créneau 2 - J2 Après-midi,15:15,16:15,JOUR2_APRES_MIDI
+Créneau 3 - J2 Après-midi,16:30,17:30,JOUR2_APRES_MIDI
+Créneau 4 - J2 Après-midi,17:45,18:45,JOUR2_APRES_MIDI

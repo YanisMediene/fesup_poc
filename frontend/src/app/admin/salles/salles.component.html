@@ -1,0 +1,140 @@
+<div class="salles-container">
+  <div class="header">
+    <button class="btn-back" (click)="goBack()">
+      <span class="icon">←</span> Retour
+    </button>
+    <h1>🏢 Gestion des Salles</h1>
+    <div class="header-actions">
+      <button class="btn-delete-all" (click)="deleteAllSalles()" [disabled]="loading || salles.length === 0" title="Supprimer toutes les salles">
+        🗑️ Supprimer Tout
+      </button>
+      <button class="btn-primary" (click)="openCreateForm()" *ngIf="!showForm">
+        + Nouvelle Salle
+      </button>
+    </div>
+  </div>
+
+  <div class="error-message" *ngIf="error">
+    {{ error }}
+  </div>
+
+  <!-- Formulaire de création/édition -->
+  <div class="form-modal" *ngIf="showForm">
+    <div class="form-container">
+      <h2>{{ editingId ? 'Modifier la salle' : 'Nouvelle salle' }}</h2>
+      
+      <form [formGroup]="salleForm" (ngSubmit)="onSubmit()">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="nom">Nom de la salle *</label>
+            <input
+              id="nom"
+              type="text"
+              formControlName="nom"
+              placeholder="Ex: Amphithéâtre A"
+            />
+            <div class="error" *ngIf="salleForm.get('nom')?.invalid && salleForm.get('nom')?.touched">
+              <span *ngIf="salleForm.get('nom')?.errors?.['required']">Le nom est requis</span>
+              <span *ngIf="salleForm.get('nom')?.errors?.['minlength']">Le nom doit contenir au moins 2 caractères</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="batiment">Bâtiment *</label>
+            <input
+              id="batiment"
+              type="text"
+              formControlName="batiment"
+              placeholder="Ex: Bâtiment B"
+            />
+            <div class="error" *ngIf="salleForm.get('batiment')?.invalid && salleForm.get('batiment')?.touched">
+              Le bâtiment est requis
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="capacite">Capacité *</label>
+            <input
+              id="capacite"
+              type="number"
+              formControlName="capacite"
+              min="1"
+              placeholder="30"
+            />
+            <div class="error" *ngIf="salleForm.get('capacite')?.invalid && salleForm.get('capacite')?.touched">
+              La capacité doit être > 0
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="equipements">Équipements</label>
+          <input
+            id="equipements"
+            type="text"
+            formControlName="equipements"
+            placeholder="Ex: Vidéoprojecteur, Micro, Wi-Fi"
+          />
+          <small>Séparés par des virgules</small>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" (click)="closeForm()" [disabled]="loading">
+            Annuler
+          </button>
+          <button type="submit" class="btn-primary" [disabled]="loading || salleForm.invalid">
+            {{ loading ? 'Enregistrement...' : (editingId ? 'Modifier' : 'Créer') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Liste des salles -->
+  <div class="table-container" *ngIf="!showForm">
+    <div class="loading" *ngIf="loading">Chargement...</div>
+    
+    <table *ngIf="!loading && salles.length > 0">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Bâtiment</th>
+          <th>Capacité</th>
+          <th>Équipements</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let salle of salles">
+          <td><strong>{{ salle.nom }}</strong></td>
+          <td>{{ salle.batiment }}</td>
+          <td>
+            <span class="badge badge-capacity">
+              👥 {{ salle.capacite }} places
+            </span>
+          </td>
+          <td class="equipements-cell">
+            <span class="equipement-tag" *ngFor="let eq of salle.equipements?.split(',') || []">
+              {{ eq.trim() }}
+            </span>
+          </td>
+          <td class="actions-cell">
+            <button class="btn-icon btn-edit" (click)="openEditForm(salle)" title="Modifier">
+              ✏️
+            </button>
+            <button class="btn-icon btn-delete" (click)="deleteSalle(salle.id!, salle.nom)" title="Supprimer">
+              🗑️
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="empty-state" *ngIf="!loading && salles.length === 0">
+      <p>Aucune salle pour le moment</p>
+      <button class="btn-primary" (click)="openCreateForm()">
+        Créer la première salle
+      </button>
+    </div>
+  </div>
+</div>

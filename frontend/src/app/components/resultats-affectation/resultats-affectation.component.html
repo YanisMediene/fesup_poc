@@ -1,0 +1,169 @@
+<div class="affectation-container">
+  <div class="header">
+    <button class="btn-back" routerLink="/admin/dashboard">
+      ← Retour au tableau de bord
+    </button>
+    <h1>🎯 Résultats d'Affectation</h1>
+    <button class="btn-delete-all" (click)="deleteAllAffectations()" [disabled]="!hasResults" title="Supprimer toutes les affectations et PDFs">
+      🗑️ Supprimer Tout
+    </button>
+    <p class="subtitle">Algorithme d'optimisation des affectations élèves-activités</p>
+  </div>
+
+  <!-- Contrôles -->
+  <div class="controls-card">
+    <button 
+      class="btn-launch" 
+      (click)="lancerAlgorithme()" 
+      [disabled]="isRunning"
+      [class.running]="isRunning">
+      <span *ngIf="!isRunning">🚀 Lancer l'algorithme</span>
+      <span *ngIf="isRunning">⏳ Calcul en cours...</span>
+    </button>
+    
+    <button 
+      class="btn-generate-tickets" 
+      (click)="genererTousLesTickets()" 
+      [disabled]="!hasResults || isGeneratingTickets"
+      *ngIf="hasResults">
+      <span *ngIf="!isGeneratingTickets">📄 Générer tous les tickets PDF</span>
+      <span *ngIf="isGeneratingTickets">⏳ Génération en cours...</span>
+    </button>
+    
+    <div class="status" *ngIf="isRunning">
+      <div class="spinner"></div>
+      <p>L'algorithme est en cours d'exécution (jusqu'à 5 minutes)</p>
+    </div>
+  </div>
+
+  <!-- Statistiques -->
+  <div class="stats-grid" *ngIf="hasResults">
+    <div class="stat-card score">
+      <div class="stat-icon">🏆</div>
+      <div class="stat-content">
+        <h3>Score Total</h3>
+        <p class="stat-value">{{ score }}</p>
+        <small>Hard: {{ hardScore }} | Soft: {{ softScore }}</small>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-content">
+        <h3>Total Élèves</h3>
+        <p class="stat-value">{{ calculateStats().total }}</p>
+      </div>
+    </div>
+
+    <div class="stat-card success">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <h3>Affectés</h3>
+        <p class="stat-value">{{ calculateStats().affectes }}</p>
+      </div>
+    </div>
+
+    <div class="stat-card warning">
+      <div class="stat-icon">⚠️</div>
+      <div class="stat-content">
+        <h3>Non Affectés</h3>
+        <p class="stat-value">{{ calculateStats().nonAffectes }}</p>
+      </div>
+    </div>
+
+    <div class="stat-card satisfaction">
+      <div class="stat-icon">📊</div>
+      <div class="stat-content">
+        <h3>Taux Satisfaction</h3>
+        <p class="stat-value">{{ calculateStats().tauxSatisfaction }}%</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tableau des affectations -->
+  <div class="table-card" *ngIf="hasResults">
+    <h2>📋 Affectations détaillées ({{ affectations.length }})</h2>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Élève</th>
+            <th>Lycée</th>
+            <th>Activité</th>
+            <th>Type</th>
+            <th>Salle</th>
+            <th>Créneau</th>
+            <th>Demi-journée</th>
+            <th>Action</th>
+            <th>Ticket</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let affectation of affectations">
+            <td><strong>{{ affectation.eleve.nom }} {{ affectation.eleve.prenom }}</strong></td>
+            <td>{{ affectation.eleve.lycee?.nom || 'N/A' }}</td>
+            <td>
+              <span *ngIf="affectation.assignedSession">
+                {{ affectation.assignedSession.activite.titre }}
+              </span>
+              <span *ngIf="!affectation.assignedSession" class="no-session">
+                Non affecté
+              </span>
+            </td>
+            <td>
+              <span *ngIf="affectation.assignedSession" class="badge type-{{ affectation.assignedSession.activite.type }}">
+                {{ affectation.assignedSession.activite.type }}
+              </span>
+            </td>
+            <td>{{ affectation.assignedSession?.salle?.nom || '-' }}</td>
+            <td>{{ affectation.assignedSession?.creneau?.libelle || '-' }}</td>
+            <td>
+              <span *ngIf="affectation.assignedSession" class="badge dj-{{ affectation.assignedSession.creneau?.demiJournee }}">
+                {{ (affectation.assignedSession.creneau?.demiJournee || '') | demiJourneeLabel }}
+              </span>
+            </td>
+            <td>
+              <select 
+                class="session-select"
+                [value]="affectation.assignedSession?.id || ''"
+                (change)="onSessionChange(affectation, $event)">
+                <option value="">-- Choisir session --</option>
+                <option 
+                  *ngFor="let session of getSessionsForEleve(affectation)" 
+                  [value]="session.id">
+                  {{ session.activiteTitre }} - {{ session.salleNom }} - {{ session.creneauLibelle }}
+                </option>
+              </select>
+            </td>
+            <td>
+              <div class="ticket-actions">
+                <button 
+                  class="btn-ticket-download" 
+                  (click)="telechargerTicketEleve(affectation.eleve)"
+                  title="Télécharger le ticket">
+                  ⬇️
+                </button>
+                <button 
+                  class="btn-ticket-regenerate" 
+                  (click)="regenererTicketEleve(affectation.eleve)"
+                  title="Régénérer le ticket">
+                  🔄
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="affectations.length === 0">
+            <td colspan="9" class="empty">Aucune affectation disponible</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Message si pas de résultats -->
+  <div class="no-results" *ngIf="!hasResults && !isRunning">
+    <div class="no-results-icon">📭</div>
+    <h3>Aucun résultat disponible</h3>
+    <p>Lancez l'algorithme pour générer les affectations</p>
+  </div>
+</div>

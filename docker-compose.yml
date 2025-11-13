@@ -1,0 +1,129 @@
+# ============================================
+# EPIC-6 : Docker Compose - FESUP Application
+# Backend (Spring Boot) + Frontend (Angular/Nginx) + PostgreSQL
+# ============================================
+
+version: '3.8'
+
+services:
+  # ========== SERVICE 1 : BASE DE DONNÉES POSTGRESQL ==========
+  db:
+    image: postgres:16-alpine
+    container_name: fesup-postgres
+    restart: unless-stopped
+    
+    environment:
+      POSTGRES_DB: fesup_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    
+    volumes:
+      # Volume pour la persistance des données
+      - postgres_data:/var/lib/postgresql/data
+      # Optionnel : Script d'initialisation SQL
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    
+    # Exposer PostgreSQL pour accès depuis pgAdmin (développement)
+    ports:
+      - "5434:5432"  # Port 5434 pour éviter conflit avec votre PostgreSQL local
+    
+    networks:
+      - fesup-network
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fesup_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ========== SERVICE 2 : BACKEND (SPRING BOOT) ==========
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    
+    container_name: fesup-backend
+    restart: unless-stopped
+    
+    depends_on:
+      db:
+        condition: service_healthy
+    
+    environment:
+      # Configuration Spring Boot
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/fesup_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: false
+      
+      # Configuration des tickets PDF
+      APPLICATION_TICKETS_STORAGE_PATH: /app/tickets
+      
+      # Configuration JVM
+      JAVA_OPTS: -Xmx512m -Xms256m -XX:+UseG1GC
+    
+    volumes:
+      # Volume pour stocker les tickets PDF générés
+      - tickets_storage:/app/tickets
+    
+    # Ne PAS exposer de ports à l'hôte (uniquement accessible via le réseau Docker)
+    # Le frontend Nginx fera le reverse proxy
+    expose:
+      - "8080"
+    
+    networks:
+      - fesup-network
+    
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost 8080 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ========== SERVICE 3 : FRONTEND (ANGULAR + NGINX) ==========
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    
+    container_name: fesup-frontend
+    restart: unless-stopped
+    
+    depends_on:
+      backend:
+        condition: service_healthy
+    
+    ports:
+      # Exposer le port 80 pour accéder à l'application via http://localhost
+      - "80:80"
+    
+    networks:
+      - fesup-network
+    
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+# ========== VOLUMES ==========
+volumes:
+  postgres_data:
+    driver: local
+    name: fesup_postgres_data
+  
+  tickets_storage:
+    driver: local
+    name: fesup_tickets_storage
+
+# ========== RÉSEAUX ==========
+networks:
+  fesup-network:
+    driver: bridge
+    name: fesup-network

@@ -1,0 +1,43 @@
+# ============================================
+# .dockerignore pour Backend Spring Boot
+# Exclure les fichiers inutiles du contexte Docker
+# ============================================
+
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Fichiers temporaires
+*.tmp
+*.bak
+*.swp
+*~
+
+# Tests
+*.class
+!**/src/main/**
+!**/src/test/**
+
+# Documentation
+README.md
+HELP.md

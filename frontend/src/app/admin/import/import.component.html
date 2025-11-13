@@ -1,0 +1,97 @@
+<div class="import-container">
+  <div class="import-header">
+    <button class="btn-back" (click)="goBack()">← Retour</button>
+    <h1>Import CSV</h1>
+  </div>
+
+  <!-- Step 1: Select Type -->
+  <div class="step-section" *ngIf="!selectedType">
+    <h2>Sélectionnez le type d'import</h2>
+    <div class="type-grid">
+      <div class="type-card" (click)="selectType('eleves')">
+        <div class="icon">👨‍🎓</div>
+        <h3>Élèves</h3>
+        <p>Format: nom, prenom, lycee, demiJournee</p>
+      </div>
+      <div class="type-card" (click)="selectType('activites')">
+        <div class="icon">🎯</div>
+        <h3>Activités</h3>
+        <p>Format: titre, description, type, demiJournee, capaciteMax</p>
+      </div>
+      <div class="type-card" (click)="selectType('salles')">
+        <div class="icon">🏢</div>
+        <h3>Salles</h3>
+        <p>Format: nom, capacite, batiment, equipements</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Upload File -->
+  <div class="step-section" *ngIf="selectedType && !report">
+    <h2>Import de {{ selectedType }}</h2>
+    
+    <div class="upload-zone">
+      <input 
+        type="file" 
+        accept=".csv" 
+        (change)="onFileSelected($event)"
+        id="fileInput"
+        style="display: none;">
+      
+      <label for="fileInput" class="upload-label">
+        <div class="upload-icon">📁</div>
+        <p *ngIf="!selectedFile">Cliquez pour sélectionner un fichier CSV</p>
+        <p *ngIf="selectedFile" class="file-selected">✓ {{ selectedFile.name }}</p>
+      </label>
+    </div>
+
+    <div class="alert-error" *ngIf="error">{{ error }}</div>
+
+    <div class="action-buttons">
+      <button class="btn-secondary" (click)="reset()">Annuler</button>
+      <button 
+        class="btn-primary" 
+        [disabled]="!selectedFile || loading"
+        (click)="uploadFile()">
+        <span *ngIf="!loading">Importer</span>
+        <span *ngIf="loading">Import en cours...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 3: Report -->
+  <div class="step-section" *ngIf="report">
+    <h2>Rapport d'import</h2>
+    
+    <div class="report-summary">
+      <div class="summary-card success">
+        <div class="number">{{ report.successCount }}</div>
+        <div class="label">Lignes importées</div>
+      </div>
+      <div class="summary-card error" *ngIf="report.errorCount > 0">
+        <div class="number">{{ report.errorCount }}</div>
+        <div class="label">Erreurs</div>
+      </div>
+      <div class="summary-card total">
+        <div class="number">{{ report.totalLines }}</div>
+        <div class="label">Total lignes</div>
+      </div>
+    </div>
+
+    <div class="error-details" *ngIf="report.errors && report.errors.length > 0">
+      <h3>Détails des erreurs</h3>
+      <div class="error-list">
+        <div class="error-item" *ngFor="let error of report.errors">
+          <div class="error-line">Ligne {{ error.lineNumber }}</div>
+          <div class="error-reason">{{ error.reason }}</div>
+          <div class="error-content">{{ error.lineContent }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn-secondary" (click)="reset()">Nouvel import</button>
+      <button class="btn-primary" (click)="goBack()">Retour au dashboard</button>
+    </div>
+  </div>
+</div>

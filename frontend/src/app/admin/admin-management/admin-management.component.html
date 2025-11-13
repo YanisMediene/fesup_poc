@@ -1,0 +1,131 @@
+<div class="admin-management-container">
+  <div class="header">
+    <button class="back-button" (click)="goBack()">
+      ← Retour au Dashboard
+    </button>
+    <h1>🔐 Gestion des Administrateurs</h1>
+    <p class="subtitle">Gérer les comptes administrateurs et super-administrateurs</p>
+  </div>
+
+  <div class="actions-bar">
+    <button class="btn btn-primary" (click)="openCreateForm()" [disabled]="loading">
+      ➕ Nouvel Administrateur
+    </button>
+  </div>
+
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+  </div>
+
+  <div *ngIf="loading && !showForm" class="loading">
+    Chargement...
+  </div>
+
+  <!-- Liste des administrateurs -->
+  <div class="admins-grid" *ngIf="!loading || showForm">
+    <div class="admin-card" *ngFor="let admin of admins">
+      <div class="admin-header">
+        <div class="admin-info">
+          <h3>{{ admin.prenom }} {{ admin.nom }}</h3>
+          <p class="admin-email">📧 {{ admin.email }}</p>
+        </div>
+        <div class="admin-badge" [class.super-admin]="admin.isSuperAdmin">
+          {{ admin.isSuperAdmin ? '👑 SUPER ADMIN' : '🛡️ ADMIN' }}
+        </div>
+      </div>
+      
+      <div class="admin-roles">
+        <span class="role-badge" *ngFor="let role of admin.roles">
+          {{ role }}
+        </span>
+      </div>
+
+      <div class="admin-actions">
+        <button class="btn btn-edit" (click)="openEditForm(admin)" [disabled]="loading">
+          ✏️ Modifier
+        </button>
+        <button class="btn btn-delete" (click)="deleteAdmin(admin)" [disabled]="loading">
+          🗑️ Supprimer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulaire de création/édition -->
+  <div class="modal" *ngIf="showForm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>{{ editingId ? 'Modifier' : 'Créer' }} un Administrateur</h2>
+        <button class="close-button" (click)="closeForm()">✕</button>
+      </div>
+
+      <form [formGroup]="adminForm" (ngSubmit)="onSubmit()">
+        <div class="form-group">
+          <label for="email">Email *</label>
+          <input 
+            type="email" 
+            id="email" 
+            formControlName="email"
+            [class.error]="adminForm.get('email')?.invalid && adminForm.get('email')?.touched"
+          />
+          <div class="error-text" *ngIf="adminForm.get('email')?.invalid && adminForm.get('email')?.touched">
+            Email requis et valide
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="prenom">Prénom *</label>
+            <input 
+              type="text" 
+              id="prenom" 
+              formControlName="prenom"
+              [class.error]="adminForm.get('prenom')?.invalid && adminForm.get('prenom')?.touched"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="nom">Nom *</label>
+            <input 
+              type="text" 
+              id="nom" 
+              formControlName="nom"
+              [class.error]="adminForm.get('nom')?.invalid && adminForm.get('nom')?.touched"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">
+            Mot de passe {{ editingId ? '(laisser vide pour ne pas modifier)' : '*' }}
+          </label>
+          <input 
+            type="password" 
+            id="password" 
+            formControlName="password"
+            [class.error]="adminForm.get('password')?.invalid && adminForm.get('password')?.touched"
+          />
+          <div class="error-text" *ngIf="adminForm.get('password')?.invalid && adminForm.get('password')?.touched">
+            Mot de passe requis (min. 6 caractères)
+          </div>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" formControlName="isSuperAdmin" />
+            <span>👑 Super Administrateur (accès à la gestion des admins)</span>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" (click)="closeForm()" [disabled]="loading">
+            Annuler
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="loading || adminForm.invalid">
+            {{ loading ? 'Enregistrement...' : (editingId ? 'Mettre à jour' : 'Créer') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

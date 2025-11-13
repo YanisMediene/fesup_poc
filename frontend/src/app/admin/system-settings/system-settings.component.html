@@ -1,0 +1,152 @@
+<div class="system-settings-container">
+  <div class="header">
+    <button class="back-button" (click)="goBack()">
+      ← Retour au Dashboard
+    </button>
+    <h1>⚙️ Réglages Système</h1>
+    <p class="subtitle">Gestion globale du système et purge des données</p>
+  </div>
+
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+  </div>
+
+  <div *ngIf="loading" class="loading">
+    Chargement...
+  </div>
+
+  <!-- Statistiques système -->
+  <div class="stats-section" *ngIf="stats && !loading">
+    <h2>📊 Statistiques Système</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value">{{ stats.eleves }}</div>
+        <div class="stat-label">Élèves</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">📝</div>
+        <div class="stat-value">{{ stats.voeux }}</div>
+        <div class="stat-label">Vœux</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-value">{{ stats.activites }}</div>
+        <div class="stat-label">Activités</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">🏛️</div>
+        <div class="stat-value">{{ stats.sessions }}</div>
+        <div class="stat-label">Sessions</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value">{{ stats.affectations }}</div>
+        <div class="stat-label">Affectations</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">🏫</div>
+        <div class="stat-value">{{ stats.lycees }}</div>
+        <div class="stat-label">Lycées</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">🚪</div>
+        <div class="stat-value">{{ stats.salles }}</div>
+        <div class="stat-label">Salles</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon">⏰</div>
+        <div class="stat-value">{{ stats.creneaux }}</div>
+        <div class="stat-label">Créneaux</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section d'export des données -->
+  <div class="export-section">
+    <h2>📥 Export des Données</h2>
+    <p class="export-description">
+      Téléchargez les données du système au format CSV
+    </p>
+
+    <div class="export-grid">
+      <button class="btn-export" (click)="exportEleves()">
+        <span class="export-icon">👥</span>
+        <span class="export-label">Élèves</span>
+      </button>
+
+      <button class="btn-export" (click)="exportActivites()">
+        <span class="export-icon">🎯</span>
+        <span class="export-label">Activités</span>
+      </button>
+
+      <button class="btn-export" (click)="exportSalles()">
+        <span class="export-icon">🚪</span>
+        <span class="export-label">Salles</span>
+      </button>
+
+      <button class="btn-export" (click)="exportCreneaux()">
+        <span class="export-icon">⏰</span>
+        <span class="export-label">Créneaux</span>
+      </button>
+
+      <button class="btn-export" (click)="exportLycees()">
+        <span class="export-icon">🏫</span>
+        <span class="export-label">Lycées</span>
+      </button>
+
+      <button class="btn-export" (click)="exportVoeux()">
+        <span class="export-icon">📝</span>
+        <span class="export-label">Vœux</span>
+      </button>
+
+      <button class="btn-export" (click)="exportSessions()">
+        <span class="export-icon">🏛️</span>
+        <span class="export-label">Sessions</span>
+      </button>
+
+      <button class="btn-export" (click)="exportAffectations()">
+        <span class="export-icon">✅</span>
+        <span class="export-label">Affectations</span>
+      </button>
+    </div>
+
+    <div class="export-all-container">
+      <button class="btn-export-all" (click)="exportAll()">
+        <span class="export-icon">📦</span>
+        <span class="export-label">Exporter toutes les données (ZIP)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Zone de danger -->
+  <div class="danger-zone">
+    <h2>⚠️ Zone de Danger</h2>
+    <div class="danger-card">
+      <div class="danger-header">
+        <h3>🗑️ Purge Totale des Données</h3>
+        <span class="danger-badge">IRRÉVERSIBLE</span>
+      </div>
+      <p class="danger-description">
+        Cette action supprimera TOUTES les données du système (vœux, affectations, sessions, élèves, activités, salles, créneaux, lycées).
+      </p>
+      <p class="danger-note">
+        ✅ Les comptes administrateurs seront préservés
+      </p>
+      <button 
+        class="btn-danger" 
+        (click)="purgeAllData()" 
+        [disabled]="loading"
+      >
+        🗑️ SUPPRIMER TOUTES LES DONNÉES
+      </button>
+    </div>
+  </div>
+</div>

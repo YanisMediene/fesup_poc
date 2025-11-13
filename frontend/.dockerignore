@@ -1,0 +1,43 @@
+# ============================================
+# .dockerignore pour Frontend Angular
+# Exclure les fichiers inutiles du contexte Docker
+# ============================================
+
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build output
+dist/
+.angular/
+.ng-build-cache/
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# Tests
+coverage/
+*.spec.ts
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Documentation
+README.md
+documentation/
+
+# Git
+.git/
+.gitignore

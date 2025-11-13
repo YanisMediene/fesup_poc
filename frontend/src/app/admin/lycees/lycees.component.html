@@ -1,0 +1,124 @@
+<div class="lycees-container">
+  <div class="header">
+    <button class="btn-back" (click)="goBack()">
+      <span class="icon">←</span> Retour
+    </button>
+    <h1>🏫 Gestion des Lycées</h1>
+    <div class="header-actions">
+      <button class="btn-delete-all" (click)="deleteAllLycees()" [disabled]="loading || lycees.length === 0" title="Supprimer tous les lycées">
+        🗑️ Supprimer Tout
+      </button>
+      <button class="btn-primary" (click)="openCreateForm()" *ngIf="!showForm">
+        + Nouveau Lycée
+      </button>
+    </div>
+  </div>
+
+  <div class="error-message" *ngIf="error">
+    {{ error }}
+  </div>
+
+  <!-- Formulaire de création/édition -->
+  <div class="form-modal" *ngIf="showForm">
+    <div class="form-container">
+      <h2>{{ editingId ? 'Modifier le lycée' : 'Nouveau lycée' }}</h2>
+      
+      <form [formGroup]="lyceeForm" (ngSubmit)="onSubmit()">
+        <div class="form-group">
+          <label for="nom">Nom du lycée *</label>
+          <input
+            id="nom"
+            type="text"
+            formControlName="nom"
+            placeholder="Ex: Lycée Jean Moulin"
+          />
+          <div class="error" *ngIf="lyceeForm.get('nom')?.invalid && lyceeForm.get('nom')?.touched">
+            <span *ngIf="lyceeForm.get('nom')?.errors?.['required']">Le nom est requis</span>
+            <span *ngIf="lyceeForm.get('nom')?.errors?.['minlength']">Le nom doit contenir au moins 3 caractères</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="ville">Ville *</label>
+            <input
+              id="ville"
+              type="text"
+              formControlName="ville"
+              placeholder="Ex: Paris"
+            />
+            <div class="error" *ngIf="lyceeForm.get('ville')?.invalid && lyceeForm.get('ville')?.touched">
+              La ville est requise
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="codePostal">Code postal *</label>
+            <input
+              id="codePostal"
+              type="text"
+              formControlName="codePostal"
+              placeholder="Ex: 75001"
+              maxlength="5"
+            />
+            <div class="error" *ngIf="lyceeForm.get('codePostal')?.invalid && lyceeForm.get('codePostal')?.touched">
+              <span *ngIf="lyceeForm.get('codePostal')?.errors?.['required']">Le code postal est requis</span>
+              <span *ngIf="lyceeForm.get('codePostal')?.errors?.['pattern']">Le code postal doit être 5 chiffres</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" (click)="closeForm()" [disabled]="loading">
+            Annuler
+          </button>
+          <button type="submit" class="btn-primary" [disabled]="loading || lyceeForm.invalid">
+            {{ loading ? 'Enregistrement...' : (editingId ? 'Modifier' : 'Créer') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Liste des lycées -->
+  <div class="table-container" *ngIf="!showForm">
+    <div class="loading" *ngIf="loading">Chargement...</div>
+    
+    <table *ngIf="!loading && lycees.length > 0">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Ville</th>
+          <th>Code Postal</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let lycee of lycees">
+          <td><strong>{{ lycee.nom }}</strong></td>
+          <td>
+            <span class="badge badge-location">
+              📍 {{ lycee.ville }}
+            </span>
+          </td>
+          <td>{{ lycee.codePostal }}</td>
+          <td class="actions-cell">
+            <button class="btn-icon btn-edit" (click)="openEditForm(lycee)" title="Modifier">
+              ✏️
+            </button>
+            <button class="btn-icon btn-delete" (click)="deleteLycee(lycee.id!, lycee.nom)" title="Supprimer">
+              🗑️
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="empty-state" *ngIf="!loading && lycees.length === 0">
+      <p>Aucun lycée pour le moment</p>
+      <button class="btn-primary" (click)="openCreateForm()">
+        Créer le premier lycée
+      </button>
+    </div>
+  </div>
+</div>

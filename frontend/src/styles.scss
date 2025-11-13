@@ -1,0 +1,115 @@
+/* Reset et styles globaux */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-secondary);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html, body {
+  height: 100%;
+}
+
+/* Variables globales - Palette du Forum FESUP */
+:root {
+  /* Couleurs principales du logo */
+  --orange: #EE8C20;
+  --rouge: #B41F1F;
+  --magenta: #C41B7D;
+  --bleu-fonce: #2A3682;
+  --cyan: #1F8EBE;
+  --vert: #12B57A;
+  --vert-clair: #8EBA3E;
+  --jaune: #FCC913;
+  
+  /* Couleurs fonctionnelles - Mode clair */
+  --primary-color: var(--bleu-fonce);
+  --secondary-color: var(--cyan);
+  --accent-color: var(--orange);
+  --success-color: var(--vert);
+  --warning-color: var(--jaune);
+  --error-color: var(--rouge);
+  --info-color: var(--magenta);
+  
+  /* Dégradés */
+  --primary-gradient: linear-gradient(135deg, var(--bleu-fonce) 0%, var(--cyan) 100%);
+  --secondary-gradient: linear-gradient(135deg, var(--orange) 0%, var(--magenta) 100%);
+  --success-gradient: linear-gradient(135deg, var(--vert) 0%, var(--vert-clair) 100%);
+  
+  /* Dégradés de fond pour chaque étape */
+  --gradient-identification: linear-gradient(135deg, var(--cyan) 0%, var(--bleu-fonce) 100%);
+  --gradient-confirmation: linear-gradient(135deg, var(--magenta) 0%, var(--bleu-fonce) 100%);
+  --gradient-formulaire: linear-gradient(135deg, var(--orange) 0%, var(--rouge) 100%);
+  --gradient-recapitulatif: linear-gradient(135deg, var(--jaune) 0%, var(--orange) 100%);
+  --gradient-final: linear-gradient(135deg, var(--vert) 0%, var(--vert-clair) 100%);
+  
+  /* Couleurs de texte - Mode clair */
+  --text-color: #2c3e50;
+  --text-secondary: #5a6c7d;
+  --text-muted: #95a5a6;
+  
+  /* Couleurs de fond - Mode clair */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  
+  /* Bordures et séparateurs */
+  --border-color: #dee2e6;
+  --border-light: #e9ecef;
+  
+  /* Ombres */
+  --shadow-sm: 0 2px 4px rgba(42, 54, 130, 0.1);
+  --shadow-md: 0 4px 8px rgba(42, 54, 130, 0.15);
+  --shadow-lg: 0 8px 16px rgba(42, 54, 130, 0.2);
+}
+
+/* Mode sombre */
+body.dark-mode {
+  /* Couleurs fonctionnelles - Mode sombre */
+  --primary-color: #4a5fc1;
+  --secondary-color: #2ba3d4;
+  --accent-color: #ff9d3d;
+  --success-color: #1ed196;
+  --warning-color: #ffd84d;
+  --error-color: #e74c5c;
+  --info-color: #d946a6;
+  
+  /* Dégradés adaptés au mode sombre */
+  --primary-gradient: linear-gradient(135deg, #3a4fb1 0%, #2ba3d4 100%);
+  --secondary-gradient: linear-gradient(135deg, #ff9d3d 0%, #d946a6 100%);
+  --success-gradient: linear-gradient(135deg, #1ed196 0%, #a0d44f 100%);
+  
+  /* Dégradés de fond pour chaque étape - Mode sombre (plus sombres) */
+  --gradient-identification: linear-gradient(135deg, #1a7a9e 0%, #1f2d5c 100%);
+  --gradient-confirmation: linear-gradient(135deg, #8e1560 0%, #1f2d5c 100%);
+  --gradient-formulaire: linear-gradient(135deg, #c96f18 0%, #8a1616 100%);
+  --gradient-recapitulatif: linear-gradient(135deg, #d4a410 0%, #c96f18 100%);
+  --gradient-final: linear-gradient(135deg, #0e8a5a 0%, #6b9030 100%);
+  
+  /* Couleurs de texte - Mode sombre */
+  --text-color: #e8eaed;
+  --text-secondary: #b0b8c1;
+  --text-muted: #6c757d;
+  
+  /* Couleurs de fond - Mode sombre */
+  --bg-primary: #1a1d2e;
+  --bg-secondary: #252938;
+  --bg-tertiary: #2f3447;
+  
+  /* Bordures et séparateurs */
+  --border-color: #3a3f52;
+  --border-light: #2f3447;
+  
+  /* Ombres adaptées */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+}

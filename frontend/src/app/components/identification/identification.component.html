@@ -1,0 +1,46 @@
+<div class="container">
+  <div class="card">
+    <h1>Saisie de vos vœux - FESUP</h1>
+    <p class="subtitle">Veuillez vous identifier pour accéder au formulaire</p>
+    
+    <form [formGroup]="formIdentification" (ngSubmit)="verifier()">
+      <div class="form-group">
+        <label for="idNational">Votre ID National *</label>
+        <input 
+          type="text" 
+          id="idNational"
+          formControlName="idNational" 
+          placeholder="Ex: 120890177FA"
+          [class.invalid]="formIdentification.get('idNational')?.invalid && formIdentification.get('idNational')?.touched">
+        <div class="error-message" *ngIf="formIdentification.get('idNational')?.invalid && formIdentification.get('idNational')?.touched">
+          Veuillez saisir un ID National valide (lettres et chiffres uniquement)
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="nom">Votre nom de famille *</label>
+        <input 
+          type="text" 
+          id="nom"
+          formControlName="nom" 
+          placeholder="Ex: DUPONT"
+          [class.invalid]="formIdentification.get('nom')?.invalid && formIdentification.get('nom')?.touched">
+        <div class="error-message" *ngIf="formIdentification.get('nom')?.invalid && formIdentification.get('nom')?.touched">
+          Veuillez saisir votre nom (minimum 2 caractères)
+        </div>
+      </div>
+      
+      <div class="alert-error" *ngIf="erreurAuth">
+        ❌ {{ erreurAuth }}
+      </div>
+      
+      <button 
+        type="submit" 
+        class="btn-primary"
+        [disabled]="formIdentification.invalid || isLoading">
+        <span *ngIf="!isLoading">Continuer</span>
+        <span *ngIf="isLoading">Vérification...</span>
+      </button>
+    </form>
+  </div>
+</div>

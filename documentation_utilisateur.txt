@@ -1,0 +1,571 @@
+# Documentation Utilisateur - Guide FESUP
+
+## 📚 Table des Matières
+
+1. Guide de l'Administrateur
+2. Guide de l'Élève
+3. FAQ
+
+---
+
+## Guide de l'Administrateur
+
+### Étape 1 : Connexion
+
+1. Ouvrir votre navigateur et aller sur **http://localhost/admin**
+2. Saisir vos identifiants :
+   - **Email** : `admin@fesup.fr`
+   - **Mot de passe** : `admin123`
+3. Cliquer sur **Connexion**
+
+Vous arrivez sur le **Tableau de bord administrateur**.
+
+---
+
+### Étape 2 : Configuration du Forum (Ordre recommandé)
+
+#### 2.1. Créer les Lycées
+
+1. Cliquer sur **Gestion des Lycées**
+2. Cliquer sur **+ Nouveau Lycée**
+3. Remplir le formulaire :
+   - **Nom** : Lycée Victor Hugo
+   - **Ville** : Paris
+   - **Code Postal** : 75001
+4. Cliquer sur **Enregistrer**
+
+Répéter pour tous les lycées participants.
+
+> 💡 **Astuce** : Vous pouvez aussi importer un fichier CSV avec le bouton **Importer CSV**.
+
+---
+
+#### 2.2. Importer les Élèves
+
+**Option A : Import CSV (Recommandé pour de gros volumes)**
+
+1. Cliquer sur **Gestion des Élèves**
+2. Cliquer sur **Importer CSV**
+3. Télécharger le modèle CSV fourni
+4. Remplir le fichier avec les colonnes :
+   - `nom`, `prenom`, `idNational`, `lycee`, `ville`, `codePostal`, `demiJournee`
+5. Uploader le fichier
+6. Vérifier le rapport d'import (succès/erreurs)
+
+> 💡 **Format ID National** : Alphanumérique majuscule, 5-50 caractères (ex: 120890177FA)
+> ⚠️ **Attention** : L'ID National doit être **unique** pour chaque élève
+
+**Option B : Création manuelle**
+
+1. Cliquer sur **+ Nouvel Élève**
+2. Remplir le formulaire :
+   - **Nom** : DUPONT
+   - **Prénom** : Jean
+   - **ID National** : 120890177FA
+   - **Lycée** : Lycée Victor Hugo
+   - **Demi-journée** : Matin
+3. Cliquer sur **Enregistrer**
+
+---
+
+#### 2.3. Créer les Salles
+
+1. Cliquer sur **Gestion des Salles**
+2. Cliquer sur **+ Nouvelle Salle**
+3. Remplir le formulaire :
+   - **Nom** : Amphithéâtre A
+   - **Capacité** : 150
+   - **Bâtiment** : Bâtiment Principal
+   - **Équipements** : Vidéoprojecteur 4K, Sono
+4. Cliquer sur **Enregistrer**
+
+> 💡 **Import CSV disponible** pour créer plusieurs salles en une fois.
+
+---
+
+#### 2.4. Créer les Créneaux Horaires
+
+1. Cliquer sur **Gestion des Créneaux**
+2. Cliquer sur **+ Nouveau Créneau**
+3. Remplir le formulaire :
+   - **Heure de début** : 09:00
+   - **Heure de fin** : 10:30
+   - **Demi-journée** : Matin
+4. Cliquer sur **Enregistrer**
+
+**Exemple de créneaux pour une journée complète :**
+
+**Matin :**
+- 09:00 - 10:30
+- 10:45 - 12:15
+
+**Après-midi :**
+- 14:00 - 15:30
+- 15:45 - 17:15
+
+---
+
+#### 2.5. Créer les Activités
+
+1. Cliquer sur **Gestion des Activités**
+2. Cliquer sur **+ Nouvelle Activité**
+3. Remplir le formulaire :
+   - **Titre** : Intelligence Artificielle et Machine Learning
+   - **Description** : Introduction aux concepts de l'IA...
+   - **Type** : Conférence
+   - **Demi-journée** : Matin
+   - **Capacité Max** : 30
+4. Cliquer sur **Enregistrer**
+
+**Types d'activités :**
+- **Conférence** : Présentation magistrale (obligatoire pour vœux 1-2)
+- **Table Ronde** : Discussion interactive
+- **Flash Métier** : Présentation courte d'un métier
+
+> 💡 **Import CSV disponible** pour créer plusieurs activités en une fois.
+
+---
+
+### Étape 3 : Génération des Sessions
+
+**Qu'est-ce qu'une session ?**
+Une session est une **instance** d'une activité dans une salle et un créneau spécifiques.
+
+**Exemple :**
+- Activité : "Intelligence Artificielle"
+- Session 1 : Amphithéâtre A, 09:00-10:30
+- Session 2 : Amphithéâtre A, 10:45-12:15
+
+---
+
+**Génération automatique :**
+
+1. Cliquer sur **Génération des Sessions**
+2. Cliquer sur **Générer automatiquement**
+3. Le système va :
+   - Analyser le nombre de vœux pour chaque activité
+   - Calculer le nombre de sessions nécessaires
+   - Assigner automatiquement les salles et créneaux
+4. Vérifier le rapport de génération :
+   - Nombre de sessions créées : 45
+   - Répartition par type d'activité
+5. Cliquer sur **Valider**
+
+> ⚠️ **Attention** : Cette opération ne peut être faite qu'**APRÈS** que les élèves aient soumis leurs vœux.
+
+---
+
+### Étape 4 : Lancer l'Algorithme d'Affectation
+
+1. Cliquer sur **Affectations** dans le menu principal
+2. Vérifier les statistiques :
+   - Nombre d'élèves ayant soumis leurs vœux
+   - Nombre de sessions disponibles
+3. Cliquer sur **Lancer l'Algorithme**
+4. Patienter pendant que l'algorithme tourne (environ 30 secondes)
+5. Une fois terminé, les résultats s'affichent automatiquement
+
+---
+
+**Interpréter les résultats :**
+
+- **Score Hard** : 0 = ✅ Toutes les contraintes respectées (pas de conflits)
+- **Score Soft** : Plus proche de 0 = ✅ Meilleure satisfaction des vœux
+- **Taux de satisfaction** : Pourcentage global de vœux satisfaits
+
+**Exemple d'affichage :**
+```
+Score : 0hard / -1250soft
+Taux de satisfaction : 85%
+Affectations : 250 (50 élèves × 5 vœux)
+```
+
+---
+
+**Actions possibles :**
+
+1. **Modifier une affectation manuellement** :
+   - Cliquer sur l'icône ✏️ à côté d'une affectation
+   - Sélectionner une autre session
+   - Enregistrer
+
+2. **Télécharger le rapport CSV** :
+   - Cliquer sur **Exporter CSV**
+   - Ouvrir dans Excel pour analyse
+
+3. **Supprimer toutes les affectations** :
+   - Cliquer sur **Supprimer tout**
+   - Confirmer (⚠️ irréversible)
+
+---
+
+### Étape 5 : Génération des Tickets PDF
+
+**Une fois l'affectation validée :**
+
+1. Cliquer sur **Générer tous les tickets PDF**
+2. La génération se fait en arrière-plan (peut prendre plusieurs minutes)
+3. Une notification vous informe de la progression :
+   - "50 tickets générés avec succès"
+   - "0 erreur"
+
+---
+
+**Télécharger le ticket d'un élève spécifique :**
+
+1. Aller dans **Gestion des Élèves**
+2. Cliquer sur l'icône 📄 à côté d'un élève
+3. Le PDF se télécharge automatiquement
+
+---
+
+**Régénérer le ticket d'un élève :**
+
+1. Aller dans **Gestion des Élèves**
+2. Cliquer sur l'icône 🔄 à côté d'un élève
+3. Le ticket est régénéré avec les affectations actuelles
+
+---
+
+### Étape 6 : Visualiser les Statistiques
+
+**Tableau de bord :**
+
+1. Revenir sur le **Tableau de bord**
+2. Vous y trouverez :
+   - **Nombre total d'élèves** : 50
+   - **Vœux soumis** : 250 (50 × 5)
+   - **Activités disponibles** : 28
+   - **Sessions créées** : 45
+   - **Tickets générés** : 50
+   - **Graphiques** :
+     - Répartition par lycée
+     - Répartition par type d'activité
+     - Taux de remplissage des sessions
+
+---
+
+### Étape 7 : Réinitialisation Système (SuperAdmin uniquement)
+
+**⚠️ ATTENTION : Cette action supprime TOUTES les données !**
+
+1. Cliquer sur **Paramètres Système**
+2. Saisir le mot de passe SuperAdmin
+3. Cliquer sur **Purger toutes les données**
+4. Confirmer la suppression
+5. Le système supprime dans l'ordre :
+   - Affectations
+   - Vœux
+   - Sessions
+   - Tickets PDF
+   - Élèves
+   - Activités
+   - Salles
+   - Créneaux
+   - Lycées
+
+> 💡 **Cas d'usage** : Réinitialiser pour une nouvelle édition du forum.
+
+---
+
+## Guide de l'Élève
+
+### Étape 1 : Identification
+
+1. Ouvrir votre navigateur et aller sur **http://localhost**
+2. Vous arrivez sur la page d'identification
+3. Saisir vos informations :
+   - **ID National** : *(fourni par votre lycée, ex: 120890177FA)*
+   - **Nom de famille** : DUPONT *(en majuscules)*
+4. Cliquer sur **Valider**
+
+> 💡 **Format ID National** : 12 chiffres suivis de 2 lettres majuscules (ex: 120890177FA)
+> 💡 **Astuce** : Le nom n'est pas sensible à la casse (dupont = DUPONT).
+
+---
+
+### Étape 2 : Confirmation de vos informations
+
+1. Vérifier que vos informations sont correctes :
+   - **Nom** : DUPONT
+   - **Prénom** : Jean
+   - **Lycée** : Lycée Victor Hugo
+   - **Demi-journée** : Matin
+2. Si c'est bien vous, cliquer sur **C'est bien moi**
+3. Sinon, cliquer sur **Retour** pour re-saisir votre ID
+
+---
+
+### Étape 3 : Formulaire de Vœux
+
+**Important : Vous devez sélectionner exactement 5 activités.**
+
+---
+
+**Vœu 1 et Vœu 2 : Conférences (obligatoire)**
+
+1. Parcourir la liste des **Conférences** disponibles
+2. Lire les descriptions et capacités
+3. Sélectionner votre **Vœu 1** (priorité maximale)
+4. Sélectionner votre **Vœu 2** (priorité 2)
+
+> ⚠️ **Règles** :
+> - Vœux 1 et 2 doivent être **différents**
+> - Ils doivent être des **Conférences** (pas de table ronde ou flash métier)
+
+---
+
+**Vœu 3, 4 et 5 : Tous types d'activités**
+
+1. Parcourir la liste de **toutes les activités** :
+   - Conférences
+   - Tables Rondes
+   - Flash Métiers
+2. Sélectionner vos vœux 3, 4 et 5
+
+> ⚠️ **Règles** :
+> - Vœux 3, 4 et 5 doivent être **différents** entre eux
+> - Vous ne pouvez pas re-sélectionner une activité déjà choisie en vœu 1 ou 2
+
+---
+
+**Exemple de sélection valide :**
+
+| Vœu | Activité | Type |
+|-----|----------|------|
+| 1 | Intelligence Artificielle | Conférence |
+| 2 | Blockchain et Cryptomonnaies | Conférence |
+| 3 | Métiers du Numérique | Table Ronde |
+| 4 | Découverte du Métier d'Ingénieur | Flash Métier |
+| 5 | Entrepreneuriat et Innovation | Conférence |
+
+---
+
+**Une fois vos 5 vœux sélectionnés :**
+
+1. Cliquer sur **Continuer**
+2. Vous arrivez sur la page de récapitulatif
+
+---
+
+### Étape 4 : Récapitulatif et Soumission
+
+1. **Vérifier attentivement** vos 5 vœux affichés :
+   - Ordre de priorité
+   - Titres des activités
+   - Types
+2. Si vous souhaitez modifier, cliquer sur **Retour**
+3. Si tout est correct, cliquer sur **Confirmer et soumettre mes vœux**
+
+> ⚠️ **Attention** : Une fois soumis, **vous ne pourrez plus modifier vos vœux**.
+
+---
+
+### Étape 5 : Confirmation de Soumission
+
+**Message affiché :**
+
+```
+✅ Vos vœux ont été enregistrés avec succès !
+
+Date de soumission : 08/11/2025 à 14:35
+
+Vous recevrez votre planning personnalisé après que les 
+administrateurs aient lancé l'algorithme d'affectation.
+```
+
+---
+
+**Que se passe-t-il ensuite ?**
+
+1. Les administrateurs attendent que tous les élèves soumettent leurs vœux
+2. Ils lancent l'algorithme d'affectation (voir Guide Admin)
+3. Ils génèrent les tickets PDF
+4. Vous pouvez revenir sur le site pour télécharger votre planning
+
+---
+
+### Étape 6 : Télécharger votre Planning (après affectation)
+
+**Une fois l'affectation effectuée :**
+
+1. Retourner sur **http://localhost**
+2. Re-saisir votre **ID National** et **Nom**
+   - Exemple : ID National = 120890177FA, Nom = DUPONT
+3. Cliquer sur **Télécharger mon planning**
+4. Le PDF se télécharge automatiquement : `planning_jean_dupont.pdf`
+
+---
+
+**Contenu du PDF :**
+
+```
+═══════════════════════════════════════════════════════
+              FESUP - Planning Personnalisé
+═══════════════════════════════════════════════════════
+
+Élève : Jean DUPONT
+ID National : 120890177FA
+Lycée : Lycée Victor Hugo
+Demi-journée : Matin
+
+───────────────────────────────────────────────────────
+Priorité | Activité                      | Salle         | Horaire
+───────────────────────────────────────────────────────
+1        | Intelligence Artificielle     | Amphi A       | 09:00-10:30
+2        | Blockchain et Cryptomonnaies  | Amphi B       | 10:45-12:15
+3        | Métiers du Numérique          | Salle C12     | 09:00-10:30
+4        | Découverte Métier Ingénieur   | Salle D05     | 10:45-12:15
+5        | Entrepreneuriat et Innovation | Amphi A       | 14:00-15:30
+───────────────────────────────────────────────────────
+
+Conservez ce document pour le jour du forum.
+```
+
+---
+
+## FAQ (Foire Aux Questions)
+
+### Pour les Élèves
+
+**Q1 : J'ai oublié mon ID National, que faire ?**  
+R : Contactez votre professeur principal ou l'administration de votre lycée. L'ID National vous a été fourni lors de votre inscription.
+
+---
+
+**Q2 : Mon ID National ne fonctionne pas, pourquoi ?**  
+R : Vérifiez que vous avez saisi exactement le bon format (12 chiffres + 2 lettres majuscules, ex: 120890177FA). Attention aux caractères similaires (0/O, 1/I).
+
+---
+
+**Q3 : Je me suis trompé dans mes vœux, puis-je les modifier ?**  
+R : Non, une fois soumis, les vœux ne peuvent plus être modifiés. Vérifiez bien avant de cliquer sur "Confirmer".
+
+---
+
+**Q4 : Je n'ai pas eu mon vœu n°1, pourquoi ?**  
+R : L'algorithme essaie de maximiser la satisfaction globale tout en respectant les capacités des salles. Si votre vœu 1 était une activité très demandée, il est possible que vous soyez affecté à un autre vœu.
+
+---
+
+**Q5 : Mon planning PDF n'est pas encore disponible, c'est normal ?**  
+R : Oui, les administrateurs doivent d'abord lancer l'algorithme d'affectation et générer les tickets. Revenez plus tard.
+
+---
+
+**Q6 : Je vois 2 activités au même horaire dans mon planning, c'est une erreur ?**  
+R : Non, l'algorithme garantit qu'un élève n'a jamais de conflit horaire. Vérifiez bien les créneaux indiqués.
+
+---
+
+### Pour les Administrateurs
+
+**Q1 : Puis-je lancer l'algorithme plusieurs fois ?**  
+R : Oui, mais attention : chaque nouvelle exécution **écrase les résultats précédents**. Pensez à exporter les résultats avant de relancer.
+
+---
+
+**Q2 : Comment interpréter le score de l'algorithme ?**  
+R :
+- **Hard Score = 0** : Aucune contrainte dure violée (pas de conflits) ✅
+- **Soft Score négatif** : Plus proche de 0 = meilleure satisfaction
+- **Exemple** : 0hard/-1250soft est un excellent résultat
+
+---
+
+**Q3 : Que faire si l'algorithme ne trouve pas de solution (Hard Score ≠ 0) ?**  
+R : Cela signifie qu'il est impossible de satisfaire toutes les contraintes. Solutions :
+1. Créer plus de sessions (ajouter des salles/créneaux)
+2. Réduire le nombre d'élèves par demi-journée
+3. Augmenter la capacité des salles
+
+---
+
+**Q4 : Puis-je modifier manuellement une affectation après l'algorithme ?**  
+R : Oui, vous pouvez cliquer sur ✏️ à côté d'une affectation et changer la session. N'oubliez pas de régénérer le ticket PDF de l'élève concerné.
+
+---
+
+**Q5 : Comment annuler complètement une session d'affectation et recommencer ?**  
+R :
+1. Aller dans **Affectations**
+2. Cliquer sur **Supprimer tout**
+3. Confirmer
+4. Relancer l'algorithme
+
+---
+
+**Q6 : Les élèves peuvent-ils télécharger leur planning avant que j'aie généré les PDFs ?**  
+R : Non, tant que vous n'avez pas cliqué sur "Générer tous les tickets PDF", les élèves verront un message "Ticket pas encore disponible".
+
+---
+
+**Q7 : Combien de temps prend la génération des tickets PDF ?**  
+R : Environ 1-2 secondes par ticket. Pour 50 élèves = ~2 minutes. La génération se fait en arrière-plan, vous pouvez continuer à utiliser l'interface.
+
+---
+
+**Q8 : Que fait le bouton "Purger toutes les données" ?**  
+R : Il supprime **TOUT** (élèves, activités, vœux, affectations, tickets). Utilisez-le uniquement pour réinitialiser complètement le système (ex: nouvelle édition du forum).
+
+---
+
+### Questions Techniques
+
+**Q1 : Comment sauvegarder une copie de la base de données ?**  
+R :
+```bash
+docker-compose exec db pg_dump -U fesup_user fesup_db > backup_$(date +%Y%m%d).sql
+```
+
+---
+
+**Q2 : Comment restaurer une sauvegarde ?**  
+R :
+```bash
+docker-compose exec -T db psql -U fesup_user fesup_db < backup_20251108.sql
+```
+
+---
+
+**Q3 : Les tickets PDF sont stockés où ?**  
+R : Dans un volume Docker persistant : `/var/lib/docker/volumes/fesup_tickets_storage/_data/`
+
+---
+
+**Q4 : Comment accéder directement à la base PostgreSQL ?**  
+R :
+```bash
+docker-compose exec db psql -U fesup_user -d fesup_db
+```
+
+Ou via PgAdmin sur http://localhost:5050
+
+---
+
+## Support Technique
+
+**En cas de problème :**
+
+1. Consulter les logs :
+   ```bash
+   docker-compose logs -f backend
+   ```
+
+2. Redémarrer les services :
+   ```bash
+   docker-compose restart
+   ```
+
+3. Réinitialisation complète :
+   ```bash
+   docker-compose down -v
+   ./start.sh
+   ```
+
+4. Contacter l'équipe technique avec :
+   - Logs des erreurs
+   - Captures d'écran
+   - Description précise du problème
+
+---

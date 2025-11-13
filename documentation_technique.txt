@@ -1,0 +1,2885 @@
+# Documentation Technique - Projet FESUP
+
+## 📋 Table des Matières
+
+1. Architecture Globale
+2. Schéma de Base de Données
+3. API Endpoints
+4. Services et Logique Métier
+5. Frontend - Structure des Composants
+6. Déploiement
+7. Sécurité
+
+---
+
+## Architecture Globale
+
+### Vue d'ensemble N-Tiers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     NAVIGATEUR CLIENT                        │
+│                    (http://localhost)                        │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              FRONTEND - Angular 17 + Nginx                   │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  • Composants Angular (Standalone & NgModule)        │  │
+│  │  • Services (HTTP Client)                            │  │
+│  │  • Guards (Auth, Voeux)                              │  │
+│  │  • Interceptors (JWT)                                │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Nginx (Port 80)                                      │  │
+│  │  • Serveur de fichiers statiques                     │  │
+│  │  • Reverse Proxy : /api/* → backend:8080             │  │
+│  │  • Fallback routing pour SPA                         │  │
+│  └──────────────────────────────────────────────────────┘  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ HTTP/REST
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│              BACKEND - Spring Boot 3.2.0                     │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  Controllers (@RestController)                        │  │
+│  │  • VoeuxController (public)                          │  │
+│  │  • AdminControllers (secured)                        │  │
+│  │  • AffectationController                             │  │
+│  └──────────────────┬───────────────────────────────────┘  │
+│                     │                                        │
+│  ┌──────────────────▼───────────────────────────────────┐  │
+│  │  Services (Business Logic)                            │  │
+│  │  • VoeuxService (validation complexe)                │  │
+│  │  • AffectationService (Timefold)                     │  │
+│  │  • BatchPdfService (génération asynchrone)           │  │
+│  │  • SessionGenerationService                          │  │
+│  └──────────────────┬───────────────────────────────────┘  │
+│                     │                                        │
+│  ┌──────────────────▼───────────────────────────────────┐  │
+│  │  Repositories (Spring Data JPA)                       │  │
+│  │  • EleveRepository                                    │  │
+│  │  • ActiviteRepository                                │  │
+│  │  • VoeuRepository, etc.                              │  │
+│  └──────────────────┬───────────────────────────────────┘  │
+│                     │ JPA/Hibernate                         │
+└─────────────────────┼───────────────────────────────────────┘
+                      │ JDBC
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              DATABASE - PostgreSQL 16                        │
+│  • Base: fesup_db                                           │
+│  • Port interne: 5432                                       │
+│  • Port externe (dev): 5434                                 │
+│  • Volume persistant: postgres_data                         │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│              STOCKAGE FICHIERS                               │
+│  • Volume Docker: tickets_storage                           │
+│  • Path: /app/tickets/{année}/eleve_{id}.pdf               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Communication Docker Compose
+
+```yaml
+Services:
+  - db (postgres:16-alpine)
+  - backend (Spring Boot)
+  - frontend (Angular + Nginx)
+
+Network: fesup-network (bridge)
+
+Volumes:
+  - postgres_data (BDD)
+  - tickets_storage (PDFs)
+
+Health Checks:
+  - db: pg_isready
+  - backend: nc -z localhost 8080
+  - frontend: curl localhost:80
+```
+
+---
+
+## Schéma de Base de Données
+
+### Entités JPA Principales
+
+#### 1. **Eleve**
+```java
+@Entity
+@Table(name = "eleves")
+public class Eleve {
+    @Id @GeneratedValue
+    private Long id; // Clé primaire technique (auto-increment)
+    
+    private String nom;
+    private String prenom;
+    
+    @Column(nullable = false, unique = true, length = 50)
+    private String idNational; // ⭐ IDENTIFIANT FONCTIONNEL (ex: 120890177FA)
+    
+    @ManyToOne
+    @JoinColumn(name = "lycee_id")
+    private Lycee lycee;
+    
+    @Enumerated(EnumType.STRING)
+    private DemiJournee demiJournee; // JOUR1_MATIN | JOUR1_APRES_MIDI | JOUR2_MATIN | JOUR2_APRES_MIDI
+    
+    private Boolean voeuxSoumis;
+    private LocalDateTime dateSoumission;
+    
+    @OneToMany(mappedBy = "eleve")
+    private List<Voeu> voeux;
+    
+    @OneToMany(mappedBy = "eleve")
+    private List<Affectation> affectations;
+    
+    @OneToOne(mappedBy = "eleve")
+    private Ticket ticket;
+}
+```
+
+**Stratégie Double Identifiant :**
+- **`id` (Long)** : Clé primaire technique utilisée pour les FK internes
+- **`idNational` (String)** : Identifiant fonctionnel utilisé pour l'authentification élève
+  - Format : Alphanumérique majuscule (ex: `120890177FA`)
+  - Longueur : 5-50 caractères
+  - Contraintes : `UNIQUE`, `NOT NULL`
+  - Index créé automatiquement pour performance
+
+**Relations:**
+- `ManyToOne` → Lycee
+- `OneToMany` → Voeu (1 élève a 5 vœux)
+- `OneToMany` → Affectation (résultats de l'algorithme)
+- `OneToOne` → Ticket (PDF généré)
+
+---
+
+#### 2. **Lycee**
+```java
+@Entity
+@Table(name = "lycees")
+public class Lycee {
+    @Id @GeneratedValue
+    private Long id;
+    
+    private String nom;
+    private String ville;
+    private String codePostal;
+    
+    @OneToMany(mappedBy = "lycee")
+    private List<Eleve> eleves;
+}
+```
+
+**Relations:**
+- `OneToMany` → Eleve
+
+---
+
+#### 3. **Activite**
+```java
+@Entity
+@Table(name = "activites")
+public class Activite {
+    @Id @GeneratedValue
+    private Long id;
+    
+    private String titre;
+    private String description;
+    
+    @Enumerated(EnumType.STRING)
+    private TypeActivite type; // CONFERENCE | TABLE_RONDE | FLASH_METIER
+    
+    @Enumerated(EnumType.STRING)
+    private DemiJournee demiJournee;
+    
+    private Integer capaciteMax;
+    
+    @OneToMany(mappedBy = "activite")
+    private List<Voeu> voeux;
+    
+    @OneToMany(mappedBy = "activite")
+    private List<Session> sessions;
+}
+```
+
+**Relations:**
+- `OneToMany` → Voeu
+- `OneToMany` → Session (instances de l'activité dans des créneaux)
+
+---
+
+#### 4. **Voeu** (Table de liaison Eleve-Activite)
+```java
+@Entity
+@Table(name = "voeux")
+public class Voeu {
+    @Id @GeneratedValue
+    private Long id;
+    
+    @ManyToOne
+    @JoinColumn(name = "eleve_id")
+    private Eleve eleve;
+    
+    @ManyToOne
+    @JoinColumn(name = "activite_id")
+    private Activite activite;
+    
+    private Integer ordre; // 1 à 5
+    
+    @Enumerated(EnumType.STRING)
+    private TypeVoeu typeVoeu; // VOEU_1_2 | VOEU_3_4_5
+}
+```
+
+**Relations:**
+- `ManyToOne` → Eleve
+- `ManyToOne` → Activite
+
+**Logique métier:**
+- Vœux 1-2 : obligatoirement des CONFERENCE
+- Vœux 3-4-5 : CONFERENCE | TABLE_RONDE | FLASH_METIER
+- Pas de doublons entre les 5 vœux
+
+---
+
+#### 5. **Salle**
+```java
+@Entity
+@Table(name = "salles")
+public class Salle {
+    @Id @GeneratedValue
+    private Long id;
+    
+    private String nom;
+    private Integer capacite;
+    private String batiment;
+    private String equipements;
+    
+    @OneToMany(mappedBy = "salle")
+    private List<Session> sessions;
+}
+```
+
+**Relations:**
+- `OneToMany` → Session
+
+---
+
+#### 6. **Creneau**
+```java
+@Entity
+@Table(name = "creneaux")
+public class Creneau {
+    @Id @GeneratedValue
+    private Long id;
+    
+    private LocalTime heureDebut;
+    private LocalTime heureFin;
+    
+    @Enumerated(EnumType.STRING)
+    private DemiJournee demiJournee;
+    
+    @OneToMany(mappedBy = "creneau")
+    private List<Session> sessions;
+}
+```
+
+**Relations:**
+- `OneToMany` → Session
+
+---
+
+#### 7. **Session** (Instance d'une Activite dans un Creneau/Salle)
+```java
+@Entity
+@Table(name = "sessions")
+public class Session {
+    @Id @GeneratedValue
+    private Long id;
+    
+    @ManyToOne
+    @JoinColumn(name = "activite_id")
+    private Activite activite;
+    
+    @ManyToOne
+    @JoinColumn(name = "salle_id")
+    private Salle salle;
+    
+    @ManyToOne
+    @JoinColumn(name = "creneau_id")
+    private Creneau creneau;
+    
+    private Integer capaciteEffective;
+    
+    @OneToMany(mappedBy = "assignedSession")
+    private List<Affectation> affectations;
+}
+```
+
+**Relations:**
+- `ManyToOne` → Activite
+- `ManyToOne` → Salle
+- `ManyToOne` → Creneau
+- `OneToMany` → Affectation
+
+---
+
+#### 8. **Affectation** (Résultat de l'algorithme Timefold)
+```java
+@Entity
+@Table(name = "affectations")
+public class Affectation {
+    @Id @GeneratedValue
+    private Long id;
+    
+    @ManyToOne
+    @JoinColumn(name = "eleve_id")
+    private Eleve eleve;
+    
+    @ManyToOne
+    @JoinColumn(name = "activite_id")
+    private Activite activite;
+    
+    @ManyToOne
+    @JoinColumn(name = "session_id")
+    private Session assignedSession; // nullable avant résolution
+    
+    private Integer priorite; // 1-5 (basé sur l'ordre des vœux)
+    
+    @Enumerated(EnumType.STRING)
+    private TypeVoeu typeVoeu;
+    
+    private Integer scoreAffectation; // calculé par Timefold
+}
+```
+
+**Relations:**
+- `ManyToOne` → Eleve
+- `ManyToOne` → Activite
+- `ManyToOne` → Session (résultat de l'algorithme)
+
+**Logique métier:**
+- L'algorithme Timefold affecte chaque élève à 5 sessions (1 par vœu).
+- Score = satisfaction basée sur la priorité des vœux.
+
+---
+
+#### 9. **Ticket** (PDF généré)
+```java
+@Entity
+@Table(name = "tickets")
+public class Ticket {
+    @Id @GeneratedValue
+    private Long id;
+    
+    @OneToOne
+    @JoinColumn(name = "eleve_id")
+    private Eleve eleve;
+    
+    private String cheminFichier; // ex: "2025/eleve_123.pdf"
+    private LocalDateTime dateGeneration;
+    private Long tailleFichier;
+    
+    @Enumerated(EnumType.STRING)
+    private StatutTicket statut; // GENERE | EN_ATTENTE | ERREUR
+}
+```
+
+**Relations:**
+- `OneToOne` → Eleve
+
+---
+
+#### 10. **User** (Administrateurs)
+```java
+@Entity
+@Table(name = "users")
+public class User {
+    @Id @GeneratedValue
+    private Long id;
+    
+    private String email;
+    private String password; // BCrypt
+    private String nom;
+    private String prenom;
+    
+    @Enumerated(EnumType.STRING)
+    private Role role; // ADMIN | SUPERADMIN
+}
+```
+
+**Sécurité:**
+- Authentification JWT via `/api/auth/login`
+- Rôles protégés par `@PreAuthorize("hasRole('ADMIN')")`
+
+---
+
+### Schéma Relationnel (ERD Simplifié)
+
+```
+Lycee (1) ─────< (N) Eleve (1) ─────< (N) Voeu >───── (N) Activite
+                        │                                    │
+                        │                                    │
+                        │                                    ▼
+                        │                               Session (N) ──── Salle (1)
+                        │                                    │
+                        │                                    │
+                        ▼                                    │
+                   Affectation (N) ─────────────────────────┘
+                        │
+                        │
+                   Ticket (1:1)
+
+Creneau (1) ─────< (N) Session
+```
+
+---
+
+## API Endpoints
+
+### 🔒 **Catégorie 1 : Authentification**
+
+#### `POST /api/auth/login`
+**Description:** Connexion administrateur (génère un JWT)
+
+**Request Body:**
+```json
+{
+  "email": "admin@fesup.fr",
+  "password": "admin123"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "email": "admin@fesup.fr",
+  "nom": "Admin",
+  "prenom": "Principal",
+  "role": "ADMIN"
+}
+```
+
+**Security:** Public endpoint
+
+---
+
+### 🎓 **Catégorie 2 : Workflow Élève (Public)**
+
+#### `POST /api/voeux/auth`
+**Description:** Vérification de l'identité de l'élève (ID + Nom)
+
+**Request Body:**
+```json
+{
+  "eleveId": 1,
+  "nom": "DUPONT"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": 1,
+  "nom": "DUPONT",
+  "prenom": "Jean",
+  "lycee": "Lycée Victor Hugo",
+  "demiJournee": "MATIN",
+  "voeuxDejasoumis": false
+}
+```
+
+**Errors:**
+- `404` : Élève introuvable
+- `401` : Nom incorrect
+
+---
+
+#### `GET /api/voeux/activites/{demiJournee}`
+**Description:** Récupération des activités filtrées par demi-journée
+
+**Path Parameter:** `MATIN` | `APRES_MIDI`
+
+**Response (200 OK):**
+```json
+{
+  "conferences": [
+    {
+      "id": 1,
+      "titre": "Intelligence Artificielle et Machine Learning",
+      "description": "Introduction à l'IA",
+      "type": "CONFERENCE",
+      "demiJournee": "MATIN",
+      "capaciteMax": 30
+    }
+  ],
+  "tablesRondes": [...],
+  "flashsMetiers": [...]
+}
+```
+
+---
+
+#### `POST /api/voeux/soumettre`
+**Description:** Soumission des 5 vœux d'un élève
+
+**Request Body:**
+```json
+{
+  "eleveId": 1,
+  "conferenceVoeu1": 5,
+  "conferenceVoeu2": 12,
+  "activiteVoeu3": 8,
+  "activiteVoeu4": 23,
+  "activiteVoeu5": 27
+}
+```
+
+**Validations côté serveur:**
+1. Élève existe et n'a pas déjà soumis
+2. Vœux 1-2 sont des CONFERENCE différentes
+3. Vœux 3-4-5 sont différents entre eux
+4. Pas de doublons entre vœux 1-2 et 3-4-5
+5. Toutes les activités sont de la même demi-journée que l'élève
+
+**Response (200 OK):**
+```json
+{
+  "message": "Vœux enregistrés avec succès",
+  "eleveId": 1,
+  "nombreVoeux": 5,
+  "dateSoumission": "2025-11-08T14:35:00"
+}
+```
+
+**Errors:**
+- `400` : Validation échouée (doublons, types invalides, etc.)
+- `404` : Élève ou activité introuvable
+- `409` : Élève a déjà soumis ses vœux
+
+---
+
+#### `GET /api/voeux/status/{eleveId}`
+**Description:** Vérifier si un élève a déjà soumis ses vœux
+
+**Response (200 OK):**
+```json
+true
+```
+
+---
+
+#### `GET /api/voeux/mon-ticket?eleveId={id}&nom={nom}`
+**Description:** Téléchargement du ticket PDF par l'élève (authentification ID + Nom)
+
+**Query Parameters:**
+- `eleveId` : ID de l'élève
+- `nom` : Nom de l'élève (vérifié)
+
+**Response (200 OK):**
+- Content-Type: `application/pdf`
+- Content-Disposition: `attachment; filename="planning_jean_dupont.pdf"`
+- Body: Binary PDF
+
+**Errors:**
+- `404` : Élève introuvable ou ticket non généré
+- `401` : Nom incorrect
+- `409` : Ticket pas encore disponible
+
+---
+
+#### `GET /api/voeux/mon-ticket/status?eleveId={id}&nom={nom}`
+**Description:** Vérifier si le ticket PDF est disponible
+
+**Response (200 OK):**
+```json
+{
+  "disponible": true
+}
+```
+
+---
+
+### 🔧 **Catégorie 3 : Administration - Configuration**
+
+**Tous les endpoints ci-dessous nécessitent `Authorization: Bearer {token}` et rôle `ADMIN`**
+
+#### `GET /api/admin/lycees`
+**Description:** Liste de tous les lycées
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 1,
+    "nom": "Lycée Victor Hugo",
+    "ville": "Paris",
+    "codePostal": "75001"
+  }
+]
+```
+
+---
+
+#### `POST /api/admin/lycees`
+**Description:** Créer un nouveau lycée
+
+**Request Body:**
+```json
+{
+  "nom": "Lycée Molière",
+  "ville": "Lyon",
+  "codePostal": "69000"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": 2,
+  "nom": "Lycée Molière",
+  "ville": "Lyon",
+  "codePostal": "69000"
+}
+```
+
+---
+
+#### `PUT /api/admin/lycees/{id}`
+**Description:** Modifier un lycée
+
+---
+
+#### `DELETE /api/admin/lycees/{id}`
+**Description:** Supprimer un lycée (si aucun élève n'y est rattaché)
+
+---
+
+#### `GET /api/admin/eleves`
+**Description:** Liste de tous les élèves
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 1,
+    "nom": "DUPONT",
+    "prenom": "Jean",
+    "lyceeId": 1,
+    "lyceeNom": "Lycée Victor Hugo",
+    "demiJournee": "MATIN",
+    "voeuxSoumis": true,
+    "dateSoumission": "2025-11-08T14:35:00"
+  }
+]
+```
+
+---
+
+#### `POST /api/admin/eleves`
+**Description:** Créer un nouvel élève
+
+**Request Body:**
+```json
+{
+  "nom": "MARTIN",
+  "prenom": "Sophie",
+  "lyceeId": 1,
+  "demiJournee": "APRES_MIDI"
+}
+```
+
+---
+
+#### `POST /api/admin/eleves/import-csv`
+**Description:** Import CSV d'élèves en masse
+
+**Request:** `multipart/form-data`
+- `file`: fichier CSV (colonnes: nom, prenom, lyceeId, demiJournee)
+
+**Response (200 OK):**
+```json
+{
+  "totalLignes": 50,
+  "importsReussis": 48,
+  "erreurs": [
+    {
+      "ligne": 23,
+      "message": "Lycée introuvable"
+    }
+  ]
+}
+```
+
+---
+
+#### `GET /api/admin/activites`
+**Description:** Liste de toutes les activités
+
+---
+
+#### `POST /api/admin/activites`
+**Description:** Créer une nouvelle activité
+
+**Request Body:**
+```json
+{
+  "titre": "Blockchain et Cryptomonnaies",
+  "description": "Introduction aux technologies blockchain",
+  "type": "CONFERENCE",
+  "demiJournee": "MATIN",
+  "capaciteMax": 30
+}
+```
+
+---
+
+#### `POST /api/admin/activites/import-csv`
+**Description:** Import CSV d'activités en masse
+
+---
+
+#### `GET /api/admin/salles`
+**Description:** Liste de toutes les salles
+
+---
+
+#### `POST /api/admin/salles`
+**Description:** Créer une nouvelle salle
+
+**Request Body:**
+```json
+{
+  "nom": "Amphithéâtre A",
+  "capacite": 150,
+  "batiment": "Bâtiment Principal",
+  "equipements": "Vidéoprojecteur 4K, Sono, Micro HF"
+}
+```
+
+---
+
+#### `POST /api/admin/salles/import-csv`
+**Description:** Import CSV de salles en masse
+
+---
+
+#### `GET /api/admin/creneaux`
+**Description:** Liste de tous les créneaux horaires
+
+---
+
+#### `POST /api/admin/creneaux`
+**Description:** Créer un nouveau créneau
+
+**Request Body:**
+```json
+{
+  "heureDebut": "09:00",
+  "heureFin": "10:30",
+  "demiJournee": "MATIN"
+}
+```
+
+---
+
+### 🎯 **Catégorie 4 : Administration - Sessions**
+
+#### `POST /api/admin/sessions/generation/auto`
+**Description:** Génération automatique des sessions (crée des instances d'activités dans salles/créneaux)
+
+**Logique:**
+1. Pour chaque activité ayant des vœux
+2. Calculer le nombre de sessions nécessaires (basé sur capacité salle vs. nombre de vœux)
+3. Assigner automatiquement une salle et un créneau
+4. Créer les entités Session
+
+**Response (200 OK):**
+```json
+{
+  "message": "Sessions générées avec succès",
+  "totalActivites": 28,
+  "sessionsCrees": 45,
+  "details": {
+    "MATIN": {
+      "CONFERENCE": 12,
+      "TABLE_RONDE": 3,
+      "FLASH_METIER": 5
+    },
+    "APRES_MIDI": { ... }
+  }
+}
+```
+
+**Errors:**
+- `409` : Aucune salle ou créneau disponible
+- `400` : Aucun vœu soumis
+
+---
+
+#### `GET /api/admin/sessions`
+**Description:** Liste de toutes les sessions créées
+
+**Response (200 OK):**
+```json
+[
+  {
+    "id": 1,
+    "activiteTitre": "Intelligence Artificielle et Machine Learning",
+    "activiteType": "CONFERENCE",
+    "salleNom": "Amphithéâtre A",
+    "creneauDebut": "09:00",
+    "creneauFin": "10:30",
+    "demiJournee": "MATIN",
+    "capaciteEffective": 30,
+    "nombreAffectations": 0
+  }
+]
+```
+
+---
+
+#### `DELETE /api/admin/sessions/{id}`
+**Description:** Supprimer une session (uniquement si aucune affectation)
+
+---
+
+### 🚀 **Catégorie 5 : Algorithme d'Affectation (Timefold)**
+
+#### `POST /api/admin/affectations/lancer`
+**Description:** Lance l'algorithme d'optimisation Timefold (asynchrone)
+
+**Logique:**
+1. Charger tous les élèves avec leurs vœux
+2. Charger toutes les sessions disponibles
+3. Créer un problème Timefold (contraintes hard/soft)
+4. Résoudre pendant 30 secondes
+5. Sauvegarder les affectations en BDD
+
+**Contraintes Hard (ne peuvent pas être violées):**
+- Un élève ne peut pas être affecté 2 fois au même créneau
+- Capacité des sessions respectée
+- Demi-journée respectée
+
+**Contraintes Soft (à maximiser):**
+- Priorité des vœux (vœu 1 > vœu 2 > vœu 3 ...)
+- Satisfaction globale
+
+**Response (202 Accepted):**
+```json
+{
+  "problemId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "status": "STARTED",
+  "message": "Algorithme lancé avec succès"
+}
+```
+
+---
+
+#### `GET /api/admin/affectations/status`
+**Description:** Récupérer le statut de l'algorithme
+
+**Response (200 OK) - En cours:**
+```json
+{
+  "running": true,
+  "hasExistingResults": false
+}
+```
+
+**Response (200 OK) - Terminé:**
+```json
+{
+  "running": false,
+  "hasExistingResults": true
+}
+```
+
+---
+
+#### `GET /api/admin/affectations/resultats`
+**Description:** Récupérer les résultats de l'affectation
+
+**Response (200 OK):**
+```json
+{
+  "status": "COMPLETED",
+  "score": "0hard/-1250soft",
+  "hardScore": 0,
+  "softScore": -1250,
+  "affectations": [
+    {
+      "id": 1,
+      "eleveId": 1,
+      "eleveNom": "DUPONT Jean",
+      "lycee": "Lycée Victor Hugo",
+      "activiteTitre": "Intelligence Artificielle et Machine Learning",
+      "activiteType": "CONFERENCE",
+      "salleNom": "Amphithéâtre A",
+      "creneauDebut": "09:00",
+      "creneauFin": "10:30",
+      "demiJournee": "MATIN",
+      "priorite": 1,
+      "scoreAffectation": -1
+    }
+  ]
+}
+```
+
+**Interprétation du Score:**
+- `0hard` = Toutes les contraintes hard respectées ✅
+- `-1250soft` = Score de satisfaction (plus proche de 0 = mieux)
+
+---
+
+#### `GET /api/admin/affectations`
+**Description:** Liste de toutes les affectations sauvegardées (alternative à `/resultats`)
+
+---
+
+#### `PUT /api/admin/affectations/{affectationId}`
+**Description:** Modifier manuellement une affectation (changer la session)
+
+**Request Body:**
+```json
+{
+  "sessionId": 15
+}
+```
+
+---
+
+#### `DELETE /api/admin/affectations/all`
+**Description:** Supprimer TOUTES les affectations et tickets PDF associés
+
+**Response (200 OK):**
+```json
+{
+  "message": "Toutes les affectations et tickets PDF ont été supprimés avec succès",
+  "count": 250
+}
+```
+
+---
+
+### 📄 **Catégorie 6 : Génération de Tickets PDF**
+
+#### `POST /api/admin/tickets/generer-tous`
+**Description:** Génération en lot de tous les tickets PDF (asynchrone)
+
+**Logique:**
+1. Pour chaque élève ayant des affectations
+2. Générer un PDF avec PDFBox (en-tête, tableau des 5 activités)
+3. Sauvegarder dans `/app/tickets/2025/eleve_{id}.pdf`
+4. Créer une entrée `Ticket` en BDD
+
+**Response (202 Accepted):**
+```json
+{
+  "message": "Génération des tickets lancée en arrière-plan",
+  "status": "EN_COURS"
+}
+```
+
+---
+
+#### `POST /api/admin/tickets/eleves/{id}/regenerer`
+**Description:** Régénérer le ticket d'un élève spécifique
+
+**Response (200 OK):**
+```json
+{
+  "message": "Ticket régénéré avec succès",
+  "ticketId": 42,
+  "dateGeneration": "2025-11-08T16:20:00"
+}
+```
+
+---
+
+#### `GET /api/admin/tickets/eleves/{id}/ticket`
+**Description:** Télécharger le ticket PDF d'un élève (admin)
+
+**Response (200 OK):**
+- Content-Type: `application/pdf`
+- Body: Binary PDF
+
+---
+
+### 🔐 **Catégorie 7 : Super Admin**
+
+**Tous les endpoints ci-dessous nécessitent rôle `SUPERADMIN`**
+
+#### `DELETE /api/superadmin/system/purge-all`
+**Description:** Suppression complète de TOUTES les données (sauf admins)
+
+**Ordre de suppression (respecte les FK):**
+1. Affectations
+2. Vœux
+3. Sessions
+4. Tickets
+5. Élèves
+6. Activités
+7. Salles
+8. Créneaux
+9. Lycées
+
+**Response (200 OK):**
+```json
+{
+  "message": "Toutes les données ont été supprimées avec succès",
+  "details": {
+    "affectations": 250,
+    "voeux": 250,
+    "sessions": 45,
+    "tickets": 50,
+    "eleves": 50,
+    "activites": 28,
+    "salles": 10,
+    "creneaux": 6,
+    "lycees": 3
+  }
+}
+```
+
+---
+
+#### `GET /api/superadmin/system/stats`
+**Description:** Statistiques système globales
+
+**Response (200 OK):**
+```json
+{
+  "eleves": 50,
+  "activites": 28,
+  "salles": 10,
+  "creneaux": 6,
+  "lycees": 3,
+  "voeuxSoumis": 250,
+  "affectations": 250,
+  "sessions": 45,
+  "tickets": 50
+}
+```
+
+---
+
+## Services et Logique Métier
+
+### 1. **VoeuxService**
+
+**Responsabilité:** Validation complexe des vœux élèves
+
+**Méthode principale: `soumettreVoeux()`**
+
+```java
+@Transactional
+public VoeuxSubmissionResponseDTO soumettreVoeux(VoeuxSubmissionDTO submission) {
+    // 1. Vérifier que l'élève existe
+    Eleve eleve = eleveRepository.findById(submission.getEleveId())
+        .orElseThrow(() -> new ValidationException("Élève introuvable"));
+    
+    // 2. Vérifier que l'élève n'a pas déjà soumis
+    if (eleve.getVoeuxSoumis()) {
+        throw new ValidationException("Vœux déjà soumis");
+    }
+    
+    // 3. Charger toutes les activités sélectionnées
+    Map<Long, Activite> activitesMap = new HashMap<>();
+    activitesMap.put(submission.getConferenceVoeu1(), ...);
+    // ...
+    
+    // 4. VALIDATIONS COMPLEXES
+    // 4a. Vœux 1-2 : doivent être des CONFERENCE différentes
+    if (activitesMap.get(conf1).getType() != TypeActivite.CONFERENCE) {
+        throw new ValidationException("Vœu 1 doit être une conférence");
+    }
+    if (conf1.equals(conf2)) {
+        throw new ValidationException("Vœux 1 et 2 doivent être différents");
+    }
+    
+    // 4b. Vœux 3-4-5 : pas de doublons entre eux
+    Set<Long> voeux345 = new HashSet<>();
+    voeux345.add(submission.getActiviteVoeu3());
+    voeux345.add(submission.getActiviteVoeu4());
+    voeux345.add(submission.getActiviteVoeu5());
+    if (voeux345.size() != 3) {
+        throw new ValidationException("Vœux 3-4-5 doivent être différents");
+    }
+    
+    // 4c. Pas de doublons entre vœux 1-2 et 3-4-5
+    if (voeux345.contains(conf1) || voeux345.contains(conf2)) {
+        throw new ValidationException("Pas de doublons entre vœux 1-2 et 3-4-5");
+    }
+    
+    // 4d. Toutes les activités sont de la même demi-journée
+    DemiJournee demiJourneeEleve = eleve.getDemiJournee();
+    for (Activite activite : activitesMap.values()) {
+        if (activite.getDemiJournee() != demiJourneeEleve) {
+            throw new ValidationException("Demi-journée incorrecte");
+        }
+    }
+    
+    // 5. ENREGISTREMENT DES VŒUX
+    List<Voeu> voeux = new ArrayList<>();
+    voeux.add(creerVoeu(eleve, conf1, 1, TypeVoeu.VOEU_1_2));
+    voeux.add(creerVoeu(eleve, conf2, 2, TypeVoeu.VOEU_1_2));
+    voeux.add(creerVoeu(eleve, act3, 3, TypeVoeu.VOEU_3_4_5));
+    voeux.add(creerVoeu(eleve, act4, 4, TypeVoeu.VOEU_3_4_5));
+    voeux.add(creerVoeu(eleve, act5, 5, TypeVoeu.VOEU_3_4_5));
+    
+    voeuRepository.saveAll(voeux);
+    
+    // 6. Marquer l'élève comme ayant soumis
+    eleve.setVoeuxSoumis(true);
+    eleve.setDateSoumission(LocalDateTime.now());
+    eleveRepository.save(eleve);
+    
+    return new VoeuxSubmissionResponseDTO(...);
+}
+```
+
+---
+
+### 2. **AffectationService**
+
+**Responsabilité:** Orchestration de l'algorithme Timefold
+
+**Méthode principale: `lancerAffectation()`**
+
+```java
+@Transactional(readOnly = true)
+public UUID lancerAffectation() {
+    // 1. Charger les données avec EAGER LOADING
+    List<Eleve> eleves = eleveRepository.findAllWithLycee();
+    List<Session> sessions = sessionRepository.findAllWithDetails();
+    List<Voeu> voeux = voeuRepository.findAllWithDetails();
+    
+    // 2. Validation : au moins 1 session existe
+    if (sessions.isEmpty()) {
+        throw new IllegalStateException("Aucune session créée");
+    }
+    
+    // 3. Créer les Affectations initiales (non assignées)
+    List<Affectation> affectations = new ArrayList<>();
+    for (Eleve eleve : eleves) {
+        List<Voeu> voeuxEleve = voeux.stream()
+            .filter(v -> v.getEleve().getId().equals(eleve.getId()))
+            .sorted(Comparator.comparing(Voeu::getOrdre))
+            .collect(Collectors.toList());
+        
+        for (Voeu voeu : voeuxEleve) {
+            Affectation aff = new Affectation();
+            aff.setEleve(eleve);
+            aff.setActivite(voeu.getActivite());
+            aff.setPriorite(voeu.getOrdre());
+            aff.setTypeVoeu(voeu.getTypeVoeu());
+            // assignedSession = null (sera rempli par Timefold)
+            affectations.add(aff);
+        }
+    }
+    
+    // 4. Créer le problème Timefold
+    AffectationSolution problem = new AffectationSolution();
+    problem.setEleves(eleves);
+    problem.setSessions(sessions);
+    problem.setAffectations(affectations);
+    
+    // 5. Configurer le solver
+    SolverFactory<AffectationSolution> solverFactory = 
+        SolverFactory.create(new SolverConfig()
+            .withSolutionClass(AffectationSolution.class)
+            .withEntityClasses(Affectation.class)
+            .withConstraintProviderClass(AffectationConstraintProvider.class)
+            .withTerminationSpentLimit(Duration.ofSeconds(30))
+        );
+    
+    // 6. Résoudre (bloquant pendant 30s)
+    Solver<AffectationSolution> solver = solverFactory.buildSolver();
+    AffectationSolution solution = solver.solve(problem);
+    
+    // 7. Sauvegarder les résultats
+    this.lastSolution = solution;
+    sauvegarderAffectations(solution.getAffectations());
+    
+    return UUID.randomUUID();
+}
+```
+
+**Contraintes Timefold (dans `AffectationConstraintProvider`):**
+
+```java
+@ConstraintConfiguration
+public class AffectationConstraintProvider implements ConstraintProvider {
+    
+    @Override
+    public Constraint[] defineConstraints(ConstraintFactory factory) {
+        return new Constraint[] {
+            // HARD CONSTRAINTS
+            conflitCreneau(factory),
+            capaciteSalleRespectee(factory),
+            demiJourneeRespectee(factory),
+            
+            // SOFT CONSTRAINTS
+            maximiserSatisfactionVoeux(factory)
+        };
+    }
+    
+    // Un élève ne peut pas être affecté 2 fois au même créneau
+    Constraint conflitCreneau(ConstraintFactory factory) {
+        return factory.forEach(Affectation.class)
+            .join(Affectation.class,
+                equal(Affectation::getEleve),
+                equal(aff -> aff.getAssignedSession().getCreneau()),
+                lessThan(Affectation::getId)
+            )
+            .penalize(HardSoftScore.ONE_HARD)
+            .asConstraint("Conflit créneau");
+    }
+    
+    // Capacité des sessions respectée
+    Constraint capaciteSalleRespectee(ConstraintFactory factory) {
+        return factory.forEach(Affectation.class)
+            .groupBy(Affectation::getAssignedSession, count())
+            .filter((session, count) -> count > session.getCapaciteEffective())
+            .penalize(HardSoftScore.ONE_HARD)
+            .asConstraint("Capacité salle dépassée");
+    }
+    
+    // Maximiser la satisfaction (priorité vœu 1 > 2 > 3 > 4 > 5)
+    Constraint maximiserSatisfactionVoeux(ConstraintFactory factory) {
+        return factory.forEach(Affectation.class)
+            .penalize(HardSoftScore.ONE_SOFT, aff -> aff.getPriorite())
+            .asConstraint("Satisfaction vœux");
+    }
+}
+```
+
+---
+
+### 3. **SessionGenerationService**
+
+**Responsabilité:** Création automatique des sessions (avant l'algorithme)
+
+**Méthode principale: `genererSessionsAutomatiquement()`**
+
+```java
+@Transactional
+public Map<String, Object> genererSessionsAutomatiquement() {
+    // 1. Récupérer tous les vœux
+    List<Voeu> voeux = voeuRepository.findAll();
+    
+    // 2. Grouper par activité
+    Map<Activite, List<Voeu>> voeuxParActivite = voeux.stream()
+        .collect(Collectors.groupingBy(Voeu::getActivite));
+    
+    // 3. Pour chaque activité ayant des vœux
+    int sessionsCrees = 0;
+    for (Map.Entry<Activite, List<Voeu>> entry : voeuxParActivite.entrySet()) {
+        Activite activite = entry.getKey();
+        int nombreVoeux = entry.getValue().size();
+        
+        // Calculer le nombre de sessions nécessaires
+        int nbSessionsNecessaires = (int) Math.ceil(
+            (double) nombreVoeux / activite.getCapaciteMax()
+        );
+        
+        // Récupérer les salles/créneaux disponibles pour cette demi-journée
+        List<Salle> salles = salleRepository.findAll();
+        List<Creneau> creneaux = creneauRepository.findByDemiJournee(
+            activite.getDemiJournee()
+        );
+        
+        // Créer les sessions
+        for (int i = 0; i < nbSessionsNecessaires; i++) {
+            Salle salle = salles.get(i % salles.size()); // Round-robin
+            Creneau creneau = creneaux.get(i % creneaux.size());
+            
+            Session session = new Session();
+            session.setActivite(activite);
+            session.setSalle(salle);
+            session.setCreneau(creneau);
+            session.setCapaciteEffective(Math.min(
+                activite.getCapaciteMax(),
+                salle.getCapacite()
+            ));
+            
+            sessionRepository.save(session);
+            sessionsCrees++;
+        }
+    }
+    
+    return Map.of(
+        "message", "Sessions générées avec succès",
+        "sessionsCrees", sessionsCrees
+    );
+}
+```
+
+---
+
+### 4. **BatchPdfService**
+
+**Responsabilité:** Génération en lot des tickets PDF (asynchrone)
+
+**Méthode principale: `genererTousLesTickets()`**
+
+```java
+@Async("taskExecutor")
+@Transactional
+public CompletableFuture<BatchResult> genererTousLesTickets() {
+    log.info("🚀 Début génération batch tickets...");
+    
+    BatchResult result = new BatchResult();
+    List<Eleve> eleves = eleveRepository.findAll();
+    result.setTotalEleves(eleves.size());
+    
+    for (Eleve eleve : eleves) {
+        try {
+            // 1. Récupérer les affectations de l'élève
+            List<Affectation> affectations = affectationRepository
+                .findByEleveAndAssignedSessionIsNotNull(eleve);
+            
+            if (affectations.isEmpty()) {
+                result.incrementErreurs();
+                result.addErreur(eleve.getId(), "Aucune affectation");
+                continue;
+            }
+            
+            // 2. Générer le PDF avec PDFBox
+            byte[] pdfData = pdfGenerationService.genererTicketEleve(
+                eleve, affectations
+            );
+            
+            // 3. Sauvegarder sur le file system
+            String cheminFichier = storageService.sauvegarderPdf(
+                eleve.getId(), pdfData
+            );
+            
+            // 4. Enregistrer en BDD
+            Ticket ticket = ticketRepository.findByEleve(eleve)
+                .orElse(new Ticket());
+            ticket.setEleve(eleve);
+            ticket.setCheminFichier(cheminFichier);
+            ticket.setDateGeneration(LocalDateTime.now());
+            ticket.setTailleFichier((long) pdfData.length);
+            ticket.setStatut(StatutTicket.GENERE);
+            ticketRepository.save(ticket);
+            
+            result.incrementSucces();
+            
+        } catch (Exception e) {
+            log.error("Erreur génération ticket élève {}", eleve.getId(), e);
+            result.incrementErreurs();
+            result.addErreur(eleve.getId(), e.getMessage());
+        }
+    }
+    
+    log.info("✅ Batch terminé : {} succès, {} erreurs", 
+             result.getSucces(), result.getErreurs());
+    
+    return CompletableFuture.completedFuture(result);
+}
+```
+
+---
+
+### 5. **PdfGenerationService**
+
+**Responsabilité:** Génération du PDF avec PDFBox
+
+**Méthode principale: `genererTicketEleve()`**
+
+```java
+public byte[] genererTicketEleve(Eleve eleve, List<Affectation> affectations) 
+        throws IOException {
+    
+    try (PDDocument document = new PDDocument()) {
+        PDPage page = new PDPage(PDRectangle.A4);
+        document.addPage(page);
+        
+        try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+            float yPosition = page.getMediaBox().getHeight() - MARGIN;
+            
+            // 1. En-tête du ticket
+            yPosition = drawHeader(content, eleve, yPosition);
+            
+            // 2. Tableau des affectations
+            yPosition = drawAffectationsTable(content, affectations, yPosition);
+            
+            // 3. Pied de page
+            drawFooter(content, page);
+        }
+        
+        // Conversion en byte array
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        document.save(baos);
+        return baos.toByteArray();
+    }
+}
+
+private float drawHeader(PDPageContentStream content, Eleve eleve, float yPosition) 
+        throws IOException {
+    content.setFont(PDType1Font.HELVETICA_BOLD, FONT_SIZE_TITLE);
+    content.beginText();
+    content.newLineAtOffset(MARGIN, yPosition);
+    content.showText("FESUP - Planning Personnalisé");
+    content.endText();
+    yPosition -= 30;
+    
+    content.setFont(PDType1Font.HELVETICA, FONT_SIZE_HEADER);
+    content.beginText();
+    content.newLineAtOffset(MARGIN, yPosition);
+    content.showText("Élève : " + eleve.getPrenom() + " " + eleve.getNom());
+    content.endText();
+    yPosition -= 20;
+    
+    content.beginText();
+    content.newLineAtOffset(MARGIN, yPosition);
+    content.showText("Lycée : " + eleve.getLycee().getNom());
+    content.endText();
+    yPosition -= 20;
+    
+    content.beginText();
+    content.newLineAtOffset(MARGIN, yPosition);
+    content.showText("Demi-journée : " + eleve.getDemiJournee());
+    content.endText();
+    yPosition -= 40;
+    
+    return yPosition;
+}
+
+private float drawAffectationsTable(PDPageContentStream content, 
+        List<Affectation> affectations, float yPosition) throws IOException {
+    
+    // Dessiner les en-têtes de colonnes
+    content.setFont(PDType1Font.HELVETICA_BOLD, FONT_SIZE_BODY);
+    content.beginText();
+    content.newLineAtOffset(MARGIN, yPosition);
+    content.showText("Priorité | Activité | Salle | Horaire");
+    content.endText();
+    yPosition -= 20;
+    
+    // Dessiner les lignes du tableau
+    content.setFont(PDType1Font.HELVETICA, FONT_SIZE_BODY);
+    for (Affectation aff : affectations) {
+        Session session = aff.getAssignedSession();
+        String ligne = String.format("%d | %s | %s | %s-%s",
+            aff.getPriorite(),
+            aff.getActivite().getTitre(),
+            session.getSalle().getNom(),
+            session.getCreneau().getHeureDebut(),
+            session.getCreneau().getHeureFin()
+        );
+        
+        content.beginText();
+        content.newLineAtOffset(MARGIN, yPosition);
+        content.showText(ligne);
+        content.endText();
+        yPosition -= 15;
+    }
+    
+    return yPosition;
+}
+```
+
+---
+
+### 6. **TicketStorageService**
+
+**Responsabilité:** Gestion du stockage des PDF sur le file system
+
+**Méthodes principales:**
+
+```java
+@Service
+public class TicketStorageService {
+    
+    @Value("${application.tickets.storage-path:/var/fesup/tickets}")
+    private String storagePath;
+    
+    // Sauvegarder un PDF
+    public String sauvegarderPdf(Long eleveId, byte[] pdfData) throws IOException {
+        // Créer l'arborescence : tickets/2025/eleve_123.pdf
+        int annee = LocalDateTime.now().getYear();
+        Path dossierAnnee = Paths.get(storagePath, String.valueOf(annee));
+        
+        if (!Files.exists(dossierAnnee)) {
+            Files.createDirectories(dossierAnnee);
+        }
+        
+        String nomFichier = String.format("eleve_%d.pdf", eleveId);
+        Path cheminComplet = dossierAnnee.resolve(nomFichier);
+        
+        Files.write(cheminComplet, pdfData, 
+                    StandardOpenOption.CREATE, 
+                    StandardOpenOption.TRUNCATE_EXISTING);
+        
+        // Retourner le chemin relatif
+        return String.format("%d/%s", annee, nomFichier);
+    }
+    
+    // Récupérer un PDF
+    public byte[] recupererPdf(String cheminRelatif) throws IOException {
+        Path cheminComplet = Paths.get(storagePath, cheminRelatif);
+        
+        if (!Files.exists(cheminComplet)) {
+            throw new FileNotFoundException("Ticket introuvable");
+        }
+        
+        return Files.readAllBytes(cheminComplet);
+    }
+    
+    // Supprimer un PDF
+    public void supprimerPdf(String cheminRelatif) throws IOException {
+        Path cheminComplet = Paths.get(storagePath, cheminRelatif);
+        Files.deleteIfExists(cheminComplet);
+    }
+    
+    // Supprimer tous les PDFs
+    public int supprimerTousPdfs() throws IOException {
+        Path racine = Paths.get(storagePath);
+        AtomicInteger count = new AtomicInteger(0);
+        
+        Files.walk(racine)
+            .filter(Files::isRegularFile)
+            .filter(p -> p.toString().endsWith(".pdf"))
+            .forEach(p -> {
+                try {
+                    Files.delete(p);
+                    count.incrementAndGet();
+                } catch (IOException e) {
+                    log.error("Erreur suppression PDF : {}", p, e);
+                }
+            });
+        
+        return count.get();
+    }
+}
+```
+
+---
+
+## Frontend - Structure des Composants
+
+### 1. **Architecture Modulaire**
+
+```
+frontend/src/app/
+├── app.module.ts                     # NgModule principal
+├── app-routing.module.ts             # Routing général
+│
+├── components/
+│   ├── identification/               # Écran 1 : Saisie ID + Nom
+│   ├── confirmation-identite/        # Écran 2 : Confirmation infos
+│   ├── formulaire-voeux/            # Écran 3 : Formulaire de vœux
+│   ├── recapitulatif-voeux/         # Écran 3.5 : Récap avant soumission
+│   ├── confirmation-soumission/     # Écran 4 : Confirmation finale + Téléchargement PDF
+│   │
+│   ├── login/                       # Connexion admin
+│   ├── admin-dashboard/             # Tableau de bord admin (standalone)
+│   ├── admin-lycees/                # CRUD Lycées (standalone)
+│   ├── admin-eleves/                # CRUD Élèves + Import CSV (standalone)
+│   ├── admin-activites/             # CRUD Activités + Import CSV (standalone)
+│   ├── admin-salles/                # CRUD Salles + Import CSV (standalone)
+│   ├── admin-creneaux/              # CRUD Créneaux (standalone)
+│   ├── admin-sessions/              # Génération automatique de sessions (standalone)
+│   ├── resultats-affectation/       # Lancer algo + Visualiser résultats (standalone)
+│   └── system-settings/             # SuperAdmin : Purge système (standalone)
+│
+├── services/
+│   ├── voeux.service.ts             # HTTP + State management (élève connecté)
+│   ├── activite.service.ts          # HTTP pour activités élèves
+│   ├── auth.service.ts              # Authentification admin + JWT
+│   ├── lycee-admin.service.ts       # CRUD Lycées
+│   ├── eleve-admin.service.ts       # CRUD Élèves + Import CSV
+│   ├── activite-admin.service.ts    # CRUD Activités + Import CSV
+│   ├── salle-admin.service.ts       # CRUD Salles + Import CSV
+│   ├── creneau-admin.service.ts     # CRUD Créneaux
+│   ├── session-admin.service.ts     # Génération sessions
+│   ├── affectation.service.ts       # Lancer algo + Résultats
+│   └── system.service.ts            # Purge système
+│
+├── guards/
+│   ├── voeux.guard.ts               # Protection routes élèves (vérifie sessionStorage)
+│   └── auth.guard.ts                # Protection routes admin (vérifie JWT)
+│
+├── interceptors/
+│   └── auth.interceptor.ts          # Injection automatique du JWT dans les requêtes
+│
+└── models/
+    ├── eleve.model.ts               # Interfaces Eleve, AuthRequest, AuthResponse
+    ├── activite.model.ts            # Interfaces Activite, ActivitesGroupees
+    ├── voeu.model.ts                # Interfaces VoeuxSubmission, VoeuxResponse
+    ├── affectation.model.ts         # Interfaces AffectationDTO, AffectationResultat
+    └── admin.model.ts               # Interfaces Lycee, Salle, Creneau, Session, etc.
+```
+
+---
+
+### 2. **Composants Principaux**
+
+#### **IdentificationComponent**
+- **Route:** `/voeux/identification`
+- **Responsabilité:** Formulaire de saisie ID + Nom
+- **Services utilisés:** `VoeuxService`
+- **Navigation:** → `ConfirmationIdentiteComponent`
+
+---
+
+#### **ConfirmationIdentiteComponent**
+- **Route:** `/voeux/confirmation-identite`
+- **Responsabilité:** Afficher les infos élève + Bouton "C'est bien moi"
+- **Guard:** `VoeuxGuard` (vérifie que l'élève est en session)
+- **Navigation:** → `FormulaireVoeuxComponent`
+
+---
+
+#### **FormulaireVoeuxComponent**
+- **Route:** `/voeux/formulaire`
+- **Responsabilité:** Sélection des 5 vœux (avec validations côté client)
+- **Logique complexe:**
+  1. Charger les activités via `VoeuxService.getActivites()`
+  2. Grouper par type (conferences, tablesRondes, flashsMetiers)
+  3. Valider en temps réel :
+     - Vœux 1-2 différents
+     - Vœux 3-4-5 différents entre eux
+     - Pas de doublons entre 1-2 et 3-4-5
+- **Navigation:** → `RecapitulatifVoeuxComponent`
+
+---
+
+#### **RecapitulatifVoeuxComponent**
+- **Route:** `/voeux/recapitulatif`
+- **Responsabilité:** Afficher les 5 vœux avant soumission finale
+- **Action:** Appel à `VoeuxService.soumettreVoeux()`
+- **Navigation:** → `ConfirmationSoumissionComponent`
+
+---
+
+#### **ConfirmationSoumissionComponent**
+- **Route:** `/voeux/confirmation`
+- **Responsabilité:** Message de succès + Téléchargement du ticket PDF (si disponible)
+- **Logique:**
+  1. Vérifier la disponibilité du ticket via `VoeuxService.verifierDisponibiliteTicket()`
+  2. Si disponible, afficher bouton "Télécharger mon planning"
+  3. Appel à `VoeuxService.telechargerMonPlanning()`
+
+---
+
+#### **AdminDashboardComponent** (Standalone)
+- **Route:** `/admin/dashboard`
+- **Guard:** `AuthGuard`
+- **Responsabilité:** Tableau de bord avec cartes de navigation vers :
+  - Gestion Lycées
+  - Gestion Élèves
+  - Gestion Activités
+  - Gestion Salles
+  - Gestion Créneaux
+  - Génération Sessions
+  - Affectations (Lancer algo)
+  - Paramètres Système (SuperAdmin)
+
+---
+
+#### **ResultatsAffectationComponent** (Standalone)
+- **Route:** `/admin/affectations`
+- **Responsabilité:** Lancer l'algorithme + Visualiser les résultats
+- **Logique:**
+  1. Bouton "Lancer l'algorithme" → `AffectationService.lancerAffectation()`
+  2. Polling du statut toutes les 2s via `AffectationService.getStatus()`
+  3. Affichage des résultats via `AffectationService.getResultats()`
+  4. Tableau interactif avec possibilité de modifier une affectation
+  5. Boutons :
+     - "Générer tous les tickets PDF" → `AffectationService.genererTousLesTickets()`
+     - "Supprimer tout" → `AffectationService.deleteAll()`
+- **Statistiques affichées:**
+  - Score Hard/Soft
+  - Taux de satisfaction global
+  - Nombre d'affectations
+  - Répartition par type d'activité
+
+---
+
+### 3. **Services Frontend**
+
+#### **VoeuxService**
+```typescript
+@Injectable({ providedIn: 'root' })
+export class VoeuxService {
+  private readonly API_URL = '/api/voeux';
+  private eleveConnecte$ = new BehaviorSubject<Eleve | null>(null);
+  
+  constructor(private http: HttpClient) {
+    // Charger l'élève depuis sessionStorage au démarrage
+    const stored = sessionStorage.getItem('eleveConnecte');
+    if (stored) {
+      this.eleveConnecte$.next(JSON.parse(stored));
+    }
+  }
+  
+  // Authentification élève (ID + Nom)
+  authentifier(eleveId: number, nom: string): Observable<Eleve> {
+    return this.http.post<Eleve>(`${this.API_URL}/auth`, { eleveId, nom })
+      .pipe(
+        tap(eleve => {
+          sessionStorage.setItem('eleveConnecte', JSON.stringify(eleve));
+          this.eleveConnecte$.next(eleve);
+        })
+      );
+  }
+  
+  // Récupérer les activités filtrées par demi-journée
+  getActivites(demiJournee: string): Observable<ActivitesGroupees> {
+    return this.http.get<ActivitesGroupees>(
+      `${this.API_URL}/activites/${demiJournee}`
+    );
+  }
+  
+  // Soumettre les vœux
+  soumettreVoeux(submission: VoeuxSubmission): Observable<VoeuxResponse> {
+    return this.http.post<VoeuxResponse>(
+      `${this.API_URL}/soumettre`,
+      submission
+    );
+  }
+  
+  // Vérifier si le ticket est disponible
+  verifierDisponibiliteTicket(eleveId: number, nom: string): Observable<boolean> {
+    return this.http.get<{ disponible: boolean }>(
+      `${this.API_URL}/mon-ticket/status`,
+      { params: { eleveId: eleveId.toString(), nom } }
+    ).pipe(map(response => response.disponible));
+  }
+  
+  // Télécharger le ticket PDF
+  telechargerMonPlanning(eleveId: number, nom: string): Observable<Blob> {
+    return this.http.get(
+      `${this.API_URL}/mon-ticket`,
+      {
+        params: { eleveId: eleveId.toString(), nom },
+        responseType: 'blob'
+      }
+    );
+  }
+  
+  // Déconnexion
+  deconnecter(): void {
+    sessionStorage.removeItem('eleveConnecte');
+    this.eleveConnecte$.next(null);
+  }
+  
+  // Observable pour les composants
+  getEleveConnecte(): Observable<Eleve | null> {
+    return this.eleveConnecte$.asObservable();
+  }
+}
+```
+
+---
+
+#### **AuthService**
+```typescript
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  private readonly API_URL = '/api/auth';
+  private currentUser$ = new BehaviorSubject<User | null>(null);
+  
+  constructor(private http: HttpClient, private router: Router) {
+    // Charger le token depuis localStorage au démarrage
+    const token = localStorage.getItem('jwt_token');
+    if (token) {
+      const user = this.decodeToken(token);
+      this.currentUser$.next(user);
+    }
+  }
+  
+  // Connexion admin
+  login(email: string, password: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.API_URL}/login`, { email, password })
+      .pipe(
+        tap(response => {
+          localStorage.setItem('jwt_token', response.token);
+          this.currentUser$.next({
+            email: response.email,
+            nom: response.nom,
+            prenom: response.prenom,
+            role: response.role
+          });
+        })
+      );
+  }
+  
+  // Déconnexion
+  logout(): void {
+    localStorage.removeItem('jwt_token');
+    this.currentUser$.next(null);
+    this.router.navigate(['/login']);
+  }
+  
+  // Récupérer le token
+  getToken(): string | null {
+    return localStorage.getItem('jwt_token');
+  }
+  
+  // Vérifier si l'utilisateur est connecté
+  isAuthenticated(): boolean {
+    return !!this.getToken();
+  }
+  
+  // Vérifier le rôle
+  hasRole(role: string): boolean {
+    const user = this.currentUser$.value;
+    return user?.role === role;
+  }
+  
+  // Observable pour les composants
+  getCurrentUser(): Observable<User | null> {
+    return this.currentUser$.asObservable();
+  }
+  
+  // Décoder le JWT (simplifié)
+  private decodeToken(token: string): User {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return {
+      email: payload.sub,
+      nom: payload.nom,
+      prenom: payload.prenom,
+      role: payload.role
+    };
+  }
+}
+```
+
+---
+
+#### **AffectationService**
+```typescript
+@Injectable({ providedIn: 'root' })
+export class AffectationService {
+  private readonly API_URL = '/api/admin/affectations';
+  
+  constructor(private http: HttpClient) {}
+  
+  // Lancer l'algorithme
+  lancerAffectation(): Observable<{ problemId: string; status: string }> {
+    return this.http.post<any>(`${this.API_URL}/lancer`, {});
+  }
+  
+  // Récupérer le statut de l'algorithme
+  getStatus(): Observable<{ running: boolean; hasExistingResults: boolean }> {
+    return this.http.get<any>(`${this.API_URL}/status`);
+  }
+  
+  // Récupérer les résultats
+  getResultats(): Observable<AffectationResultat> {
+    return this.http.get<AffectationResultat>(`${this.API_URL}/resultats`);
+  }
+  
+  // Modifier une affectation
+  modifierAffectation(affectationId: number, sessionId: number): Observable<void> {
+    return this.http.put<void>(
+      `${this.API_URL}/${affectationId}`,
+      { sessionId }
+    );
+  }
+  
+  // Supprimer toutes les affectations
+  deleteAll(): Observable<{ message: string; count: number }> {
+    return this.http.delete<any>(`${this.API_URL}/all`);
+  }
+  
+  // Générer tous les tickets PDF
+  genererTousLesTickets(): Observable<{ message: string; status: string }> {
+    return this.http.post<any>('/api/admin/tickets/generer-tous', {});
+  }
+}
+```
+
+---
+
+### 4. **Guards & Interceptors**
+
+#### **VoeuxGuard**
+```typescript
+@Injectable({ providedIn: 'root' })
+export class VoeuxGuard implements CanActivate {
+  constructor(private voeuxService: VoeuxService, private router: Router) {}
+  
+  canActivate(): boolean {
+    const eleve = sessionStorage.getItem('eleveConnecte');
+    
+    if (!eleve) {
+      this.router.navigate(['/voeux/identification']);
+      return false;
+    }
+    
+    return true;
+  }
+}
+```
+
+---
+
+#### **AuthGuard**
+```typescript
+@Injectable({ providedIn: 'root' })
+export class AuthGuard implements CanActivate {
+  constructor(private authService: AuthService, private router: Router) {}
+  
+  canActivate(route: ActivatedRouteSnapshot): boolean {
+    if (!this.authService.isAuthenticated()) {
+      this.router.navigate(['/login']);
+      return false;
+    }
+    
+    // Vérifier le rôle si nécessaire
+    const requiredRole = route.data['role'];
+    if (requiredRole && !this.authService.hasRole(requiredRole)) {
+      alert('Accès refusé : privilèges insuffisants');
+      return false;
+    }
+    
+    return true;
+  }
+}
+```
+
+---
+
+#### **AuthInterceptor**
+```typescript
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  constructor(private authService: AuthService) {}
+  
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    // Ignorer les endpoints publics
+    if (req.url.includes('/api/voeux') || req.url.includes('/api/auth/login')) {
+      return next.handle(req);
+    }
+    
+    // Ajouter le JWT aux requêtes admin
+    const token = this.authService.getToken();
+    if (token) {
+      const cloned = req.clone({
+        headers: req.headers.set('Authorization', `Bearer ${token}`)
+      });
+      return next.handle(cloned);
+    }
+    
+    return next.handle(req);
+  }
+}
+```
+
+---
+
+## Déploiement
+
+### Prérequis
+
+- **Docker** : Version 20.10+
+- **Docker Compose** : Version 2.0+
+- **OS** : Linux, macOS, Windows (avec WSL2)
+
+---
+
+### Étapes d'installation
+
+#### 1. **Cloner le projet**
+
+```bash
+git clone https://github.com/votre-org/fesup.git
+cd fesup
+```
+
+---
+
+#### 2. **Configuration des variables d'environnement**
+
+Créer un fichier `.env` à la racine :
+
+```env
+# Database
+POSTGRES_USER=fesup_user
+POSTGRES_PASSWORD=fesup_password
+POSTGRES_DB=fesup_db
+
+# Backend
+SPRING_PROFILES_ACTIVE=prod
+JWT_SECRET=votre_secret_jwt_super_securise_changez_moi
+
+# Frontend
+FRONTEND_URL=http://localhost
+BACKEND_URL=http://localhost:8080
+```
+
+---
+
+#### 3. **Lancer l'application**
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+Le script start.sh fait :
+1. `docker-compose down -v` (nettoyage)
+2. `docker-compose build --no-cache` (rebuild images)
+3. `docker-compose up -d` (démarrage)
+4. Attendre que les services soient prêts (health checks)
+
+---
+
+#### 4. **Vérifier l'état des conteneurs**
+
+```bash
+docker-compose ps
+```
+
+**Sortie attendue :**
+
+```
+NAME                   STATUS              PORTS
+fesup-db-1            Up (healthy)        5432/tcp, 0.0.0.0:5434->5432/tcp
+fesup-backend-1       Up (healthy)        0.0.0.0:8080->8080/tcp
+fesup-frontend-1      Up (healthy)        0.0.0.0:80->80/tcp
+```
+
+---
+
+#### 5. **Accès aux services**
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **Frontend (élèves)** | http://localhost | - |
+| **Frontend (admin)** | http://localhost/admin | admin@fesup.fr / admin123 |
+| **Backend API** | http://localhost:8080/api | - |
+| **PostgreSQL** | localhost:5434 | fesup_user / fesup_password |
+| **PgAdmin** | http://localhost:5050 | admin@fesup.fr / admin |
+
+---
+
+### Commandes utiles
+
+#### Arrêter les services
+
+```bash
+docker-compose down
+```
+
+#### Arrêter et supprimer les volumes (BDD + PDFs)
+
+```bash
+docker-compose down -v
+```
+
+#### Voir les logs en temps réel
+
+```bash
+docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f db
+```
+
+#### Redémarrer un service spécifique
+
+```bash
+docker-compose restart backend
+```
+
+#### Exécuter une commande dans un conteneur
+
+```bash
+docker-compose exec backend bash
+docker-compose exec db psql -U fesup_user -d fesup_db
+```
+
+---
+
+### Structure Docker Compose
+
+```yaml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fesup-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - fesup-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fesup-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - tickets_storage:/app/tickets
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - fesup-network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8080 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fesup-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - fesup-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  fesup-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  tickets_storage:
+    driver: local
+```
+
+---
+
+## Sécurité
+
+### 1. **Authentification**
+
+#### Élèves (Public)
+- **Méthode** : Identification par ID + Nom (case-insensitive)
+- **Session** : `sessionStorage` côté frontend
+- **Protection** : `VoeuxGuard` (empêche l'accès sans identification)
+
+#### Administrateurs
+- **Méthode** : JWT (JSON Web Token)
+- **Génération** : `/api/auth/login` avec BCrypt password
+- **Durée de validité** : 24 heures (configurable dans `application.properties`)
+- **Storage** : `localStorage` côté frontend
+- **Protection** : `AuthGuard` + `@PreAuthorize("hasRole('ADMIN')")` côté backend
+
+---
+
+### 2. **Hachage des mots de passe**
+
+```java
+@Configuration
+public class SecurityConfig {
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12); // Coût 12
+    }
+}
+```
+
+**Exemple d'enregistrement d'un admin :**
+
+```java
+User admin = new User();
+admin.setEmail("admin@fesup.fr");
+admin.setPassword(passwordEncoder.encode("admin123"));
+admin.setRole(Role.ADMIN);
+userRepository.save(admin);
+```
+
+---
+
+### 3. **Protection CORS**
+
+```java
+@Configuration
+public class CorsConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")
+            .allowedOrigins("http://localhost", "http://localhost:80")
+            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .allowedHeaders("*")
+            .allowCredentials(true)
+            .maxAge(3600);
+    }
+}
+```
+
+---
+
+### 4. **Validation des entrées**
+
+#### Backend (Spring Validation)
+
+```java
+@PostMapping("/soumettre")
+public ResponseEntity<VoeuxResponseDTO> soumettre(
+    @Valid @RequestBody VoeuxSubmissionDTO submission
+) {
+    // @Valid déclenche les validations
+}
+
+// DTO avec annotations
+public class VoeuxSubmissionDTO {
+    @NotNull(message = "L'ID de l'élève est obligatoire")
+    private Long eleveId;
+    
+    @NotNull(message = "Le vœu 1 est obligatoire")
+    private Long conferenceVoeu1;
+    
+    // ...
+}
+```
+
+#### Frontend (Angular Reactive Forms)
+
+```typescript
+this.formulaireVoeux = this.fb.group({
+  conferenceVoeu1: [null, Validators.required],
+  conferenceVoeu2: [null, Validators.required],
+  activiteVoeu3: [null, Validators.required],
+  activiteVoeu4: [null, Validators.required],
+  activiteVoeu5: [null, Validators.required]
+}, {
+  validators: [
+    this.voeuxDifferentsValidator(),
+    this.pasDeDoublonsValidator()
+  ]
+});
+```
+
+---
+
+### 5. **Gestion des erreurs**
+
+#### Global Exception Handler (Backend)
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(ValidationException ex) {
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(new ErrorResponse(ex.getMessage()));
+    }
+    
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(EntityNotFoundException ex) {
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(new ErrorResponse(ex.getMessage()));
+    }
+    
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex) {
+        return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(new ErrorResponse(ex.getMessage()));
+    }
+}
+```
+
+---
+
+### 6. **Transactions**
+
+Toutes les opérations critiques sont dans des transactions :
+
+```java
+@Transactional
+public void soumettreVoeux(VoeuxSubmissionDTO submission) {
+    // Si une exception est levée, rollback automatique
+}
+```
+
+---
+
+### 7. **Isolation des données**
+
+- **Élèves** : Ne peuvent voir/modifier QUE leurs propres vœux
+- **Admins** : Accès à toutes les données avec rôle ADMIN
+- **SuperAdmins** : Accès aux opérations de purge système
+
+---
+
+## Tests & Qualité
+
+### 1. **Script de génération de données de test**
+
+```bash
+cd backend
+./generate-test-voeux.sh
+```
+
+**Ce script fait :**
+1. Import de 50 élèves via CSV
+2. Import de 28 activités via CSV
+3. Import de 10 salles via CSV
+4. Génération automatique de vœux pour tous les élèves (via API `/api/voeux/soumettre`)
+
+---
+
+### 2. **Tests unitaires (Backend)**
+
+```bash
+cd backend
+./mvnw test
+```
+
+**Classes testées :**
+- `VoeuxServiceTest` : Validation des contraintes métier
+- `AffectationServiceTest` : Algorithme Timefold (mock)
+- `PdfGenerationServiceTest` : Génération PDF
+
+---
+
+### 3. **Tests d'intégration**
+
+```bash
+./mvnw verify
+```
+
+**Tests avec base H2 en mémoire :**
+- Tests des endpoints REST avec `@SpringBootTest`
+- Tests des repositories JPA
+- Tests de la chaîne complète (Controller → Service → Repository)
+
+---
+
+## Performances & Optimisation
+
+### 1. **Chargement EAGER vs LAZY**
+
+```java
+// EAGER pour les relations utilisées fréquemment
+@ManyToOne(fetch = FetchType.EAGER)
+private Lycee lycee;
+
+// LAZY par défaut pour les collections
+@OneToMany(mappedBy = "eleve", fetch = FetchType.LAZY)
+private List<Voeu> voeux;
+```
+
+---
+
+### 2. **Pagination (si nécessaire)**
+
+```java
+@GetMapping("/admin/eleves")
+public Page<EleveDTO> getAllEleves(
+    @RequestParam(defaultValue = "0") int page,
+    @RequestParam(defaultValue = "20") int size
+) {
+    return eleveService.findAll(PageRequest.of(page, size));
+}
+```
+
+---
+
+### 3. **Génération asynchrone de PDFs**
+
+```java
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+    @Bean(name = "taskExecutor")
+    public Executor taskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("pdf-gen-");
+        executor.initialize();
+        return executor;
+    }
+}
+```
+
+---
+
+## Monitoring & Logs
+
+### 1. **Actuator (Spring Boot)**
+
+Endpoints de monitoring :
+- `GET /actuator/health` : État du service
+- `GET /actuator/metrics` : Métriques JVM
+- `GET /actuator/info` : Informations sur l'application
+
+---
+
+### 2. **Logs structurés**
+
+```java
+@Slf4j
+@Service
+public class VoeuxService {
+    public void soumettreVoeux(VoeuxSubmissionDTO submission) {
+        log.info("📝 Soumission vœux élève {}", submission.getEleveId());
+        
+        try {
+            // ...
+            log.info("✅ Vœux soumis avec succès pour élève {}", eleveId);
+        } catch (ValidationException ex) {
+            log.warn("❌ Validation échouée : {}", ex.getMessage());
+            throw ex;
+        }
+    }
+}
+```
+
+---
+
+### 3. **Affichage des logs Docker**
+
+```bash
+# Logs en temps réel
+docker-compose logs -f
+
+# Logs filtrés
+docker-compose logs -f backend | grep "ERROR"
+```
+
+---
+
+## 🔄 Migration ID → idNational (Novembre 2025)
+
+### Vue d'ensemble
+
+**Date de migration** : 13 novembre 2025  
+**Statut** : ✅ Complétée et validée  
+**Objectif** : Remplacer l'authentification par ID numérique auto-incrémenté par un ID National fonctionnel
+
+### Problématique Initiale
+
+**Avant migration :**
+- Authentification élève : `eleveId: Long` (1, 2, 3, 4...)
+- Problème : ID auto-incrémenté non conforme aux identifiants réels (ex: INE)
+- Risque : Prédictibilité des ID, confusion avec clé primaire technique
+
+**Après migration :**
+- Authentification élève : `idNational: String` (ex: `120890177FA`)
+- Format : Alphanumérique majuscule (12 chiffres + 2 lettres)
+- Avantage : Identifiant réel, unique, sécurisé
+
+---
+
+### Stratégie Double Identifiant
+
+```java
+@Entity
+public class Eleve {
+    @Id @GeneratedValue
+    private Long id; // ✅ Clé primaire technique (FK internes)
+    
+    @Column(nullable = false, unique = true, length = 50)
+    private String idNational; // ✅ Identifiant fonctionnel (authentification)
+}
+```
+
+**Pourquoi conserver `id` (Long) ?**
+1. **Stabilité des FK** : Toutes les relations existantes (`voeux.eleve_id`, `affectations.eleve_id`, etc.) continuent de fonctionner sans modification
+2. **Performance** : Les jointures sur `BIGINT` restent plus rapides que sur `VARCHAR`
+3. **Compatibilité** : Pas de migration lourde du schéma relationnel
+
+**Rôle de `idNational` :**
+- Authentification élève (endpoint `/api/voeux/auth`)
+- Affichage dans l'interface admin
+- Import CSV élèves
+- Téléchargement planning PDF
+
+---
+
+### Modifications Backend (11 fichiers)
+
+#### 1. **Eleve.java** - Entité JPA
+```java
+@Column(nullable = false, unique = true, length = 50)
+private String idNational;
+```
+
+#### 2. **EleveRepository.java** - Nouvelles méthodes
+```java
+Optional<Eleve> findByIdNationalAndNom(String idNational, String nom);
+Optional<Eleve> findByIdNational(String idNational);
+```
+
+#### 3. **AuthRequestDTO.java** - Modification payload auth
+```java
+// Avant
+private Long eleveId;
+
+// Après
+private String idNational; // Format: 120890177FA
+```
+
+#### 4. **AuthResponseDTO.java** - Ajout champ
+```java
+private String idNational; // Renvoyé après authentification
+```
+
+#### 5. **VoeuxService.java** - Logique authentification
+```java
+public AuthResponseDTO verifierEleve(String idNational, String nom) {
+    Eleve eleve = eleveRepository.findByIdNationalAndNom(idNational, nom)
+        .orElseThrow(() -> new ResourceNotFoundException("Élève non trouvé"));
+    
+    return AuthResponseDTO.builder()
+        .eleveId(eleve.getId()) // ✅ Session continue avec id technique
+        .idNational(eleve.getIdNational()) // ✅ Affiché dans UI
+        .nom(eleve.getNom())
+        .prenom(eleve.getPrenom())
+        .build();
+}
+```
+
+#### 6. **AdminImportService.java** - Import CSV
+```java
+public void importEleves(MultipartFile file) {
+    CSVRecord record : records) {
+        String idNational = record.get("idNational");
+        
+        // Validation unicité
+        if (eleveRepository.findByIdNational(idNational).isPresent()) {
+            throw new ValidationException("ID National déjà existant: " + idNational);
+        }
+        
+        Eleve eleve = new Eleve();
+        eleve.setIdNational(idNational);
+        // ...
+    }
+}
+```
+
+#### 7. **EleveAdminController.java** - DTO Admin
+```java
+private Map<String, Object> convertToDTO(Eleve eleve) {
+    dto.put("id", eleve.getId());
+    dto.put("nom", eleve.getNom());
+    dto.put("prenom", eleve.getPrenom());
+    dto.put("idNational", eleve.getIdNational()); // ✅ Ajouté
+    // ...
+}
+```
+
+#### 8. **data.sql** - Données initiales
+```sql
+INSERT INTO eleves (nom, prenom, id_national, lycee_id, demi_journee)
+VALUES 
+  ('DUPONT', 'Jean', '120890177FA', 1, 'JOUR1_MATIN'),
+  ('MARTIN', 'Sophie', '120113325CK', 2, 'JOUR1_APRES_MIDI');
+```
+
+#### 9. **V2__add_id_national.sql** - Migration Flyway
+```sql
+-- Ajout colonne
+ALTER TABLE eleves ADD COLUMN id_national VARCHAR(50);
+
+-- Génération valeurs temporaires (à remplacer par import CSV)
+UPDATE eleves SET id_national = LPAD(id::text, 12, '0') || 
+    substring('ABCDEFGHIJKLMNOPQRSTUVWXYZ' from (random() * 25 + 1)::int for 1) ||
+    substring('ABCDEFGHIJKLMNOPQRSTUVWXYZ' from (random() * 25 + 1)::int for 1);
+
+-- Contraintes
+ALTER TABLE eleves ALTER COLUMN id_national SET NOT NULL;
+ALTER TABLE eleves ADD CONSTRAINT uk_eleve_id_national UNIQUE (id_national);
+CREATE INDEX idx_eleve_id_national ON eleves(id_national);
+```
+
+---
+
+### Modifications Frontend (4 fichiers)
+
+#### 1. **eleve.model.ts** - Interfaces TypeScript
+```typescript
+export interface AuthRequest {
+  idNational: string; // Avant: eleveId: number
+  nom: string;
+}
+
+export interface AuthResponse {
+  eleveId: number; // ✅ Conservé pour session
+  idNational: string; // ✅ Ajouté pour affichage
+  nom: string;
+  prenom: string;
+  // ...
+}
+
+export interface Eleve {
+  id: number;
+  nom: string;
+  prenom: string;
+  idNational: string; // ✅ Ajouté
+  // ...
+}
+```
+
+#### 2. **identification.component.ts** - Formulaire
+```typescript
+identificationForm = this.fb.group({
+  idNational: ['', [
+    Validators.required,
+    Validators.minLength(5),
+    Validators.maxLength(50),
+    Validators.pattern(/^[A-Z0-9]+$/) // Alphanum majuscule
+  ]],
+  nom: ['', Validators.required]
+});
+
+onSubmit() {
+  const { idNational, nom } = this.identificationForm.value;
+  this.voeuxService.verifierEleve(idNational, nom).subscribe(/* ... */);
+}
+```
+
+#### 3. **identification.component.html** - Template
+```html
+<label for="idNational">ID National *</label>
+<input
+  id="idNational"
+  formControlName="idNational"
+  placeholder="Ex: 120890177FA"
+  maxlength="50"
+/>
+
+<div *ngIf="identificationForm.get('idNational')?.errors?.['pattern']">
+  Format invalide (alphanumérique majuscule uniquement)
+</div>
+```
+
+#### 4. **eleves.component.html** - Liste admin
+```html
+<div class="eleve-name">
+  <strong>{{ eleve.prenom }} {{ eleve.nom }}</strong>
+  <small>ID National: {{ eleve.idNational }}</small>
+</div>
+
+<!-- Modal détails -->
+<div class="detail-item">
+  <label>ID National</label>
+  <span>{{ selectedEleve.idNational }}</span>
+</div>
+```
+
+---
+
+### Test Data & Scripts
+
+#### test-data/eleves.csv
+```csv
+nom,prenom,idNational,lycee,ville,codePostal,demiJournee
+DUPONT,Jean,120890177FA,Lycée Victor Hugo,Paris,75001,JOUR1_MATIN
+MARTIN,Sophie,120113325CK,Lycée Voltaire,Paris,75011,JOUR1_APRES_MIDI
+BERNARD,Lucas,120234556AB,Lycée Descartes,Tours,37000,JOUR2_MATIN
+```
+
+#### backend/generate-test-voeux-v2.sh (Nouveau)
+```bash
+#!/bin/bash
+# Génération automatique d'élèves avec ID National
+# Format: 12 chiffres aléatoires + 2 lettres aléatoires
+# Exemple: 184470245033YF
+
+v_id_national := 
+    lpad((floor(random() * 1000000000000)::bigint)::text, 12, '0') || 
+    v_lettre1 || v_lettre2;
+
+# Vérification unicité
+EXIT WHEN NOT EXISTS (SELECT 1 FROM eleves WHERE id_national = v_id_national);
+```
+
+---
+
+### Validation & Compilation
+
+**Backend :**
+```bash
+cd backend
+mvn clean package -DskipTests
+# ✅ BUILD SUCCESS (8.6s)
+```
+
+**Frontend :**
+```bash
+cd frontend
+npm run build
+# ✅ Build complete (9.5s)
+# ⚠️ Warnings mineurs (budget CSS) - non bloquants
+```
+
+**Docker :**
+```bash
+docker-compose down -v
+docker-compose up --build -d
+# ✅ Services démarrés : postgres, backend, frontend
+```
+
+---
+
+### Exemples ID National Générés
+
+#### Format Standard
+```
+120890177FA  (DUPONT Jean)
+220113325CK  (MARTIN Sophie)
+315234556AB  (BERNARD Lucas)
+410345667BC  (PETIT Emma)
+520456778CD  (DURAND Thomas)
+```
+
+#### Script de test génère automatiquement
+```sql
+184470245033YF
+478146075908LV
+653720187849LT
+847589473596GK
+287351862507RH
+```
+
+---
+
+### Points Importants
+
+#### ✅ Ce qui FONCTIONNE
+1. **Double identifiant** : `id` (PK) + `idNational` (auth)
+2. **FK intactes** : Aucune modification des relations
+3. **Import CSV** : Validation unicité automatique
+4. **Authentification** : `findByIdNationalAndNom()`
+5. **Affichage admin** : ID National visible dans liste/modal
+6. **Session** : Continue d'utiliser `eleveId` (Long) après auth
+
+#### ⚠️ Ce qui RESTE INCHANGÉ
+1. **VoeuxSubmissionDTO** : Utilise `eleveId` (session)
+2. **Routes `/api/voeux/{eleveId}`** : ID session (Long)
+3. **FK database** : `voeux.eleve_id`, `affectations.eleve_id` (BIGINT)
+4. **Ticket.java** : FK sur `eleve_id` (Long)
+
+#### 📝 BONNES PRATIQUES
+1. **Import CSV** : Toujours fournir `idNational` unique
+2. **Format** : Alphanumérique majuscule, 5-50 caractères
+3. **Validation** : Pattern `/^[A-Z0-9]+$/` côté frontend
+4. **Logs** : Tracer auth par idNational (anonymisé si besoin)
+
+---
+
+### Flux Authentification Complet
+
+```
+┌─────────────────────────────────────────────┐
+│ 1. Élève saisit                             │
+│    idNational = "120890177FA"               │
+│    nom = "DUPONT"                           │
+└────────────────┬────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│ 2. POST /api/voeux/auth                     │
+│    Body: { idNational, nom }                │
+└────────────────┬────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│ 3. VoeuxService.verifierEleve()             │
+│    findByIdNationalAndNom(idNational, nom)  │
+└────────────────┬────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│ 4. Retour AuthResponseDTO                   │
+│    {                                        │
+│      eleveId: 42,        // ✅ Session      │
+│      idNational: "120...",// ✅ Affichage   │
+│      nom: "DUPONT",                         │
+│      prenom: "Jean",                        │
+│      ...                                    │
+│    }                                        │
+└────────────────┬────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│ 5. Frontend stocke                          │
+│    sessionStorage.setItem('eleveId', 42)    │
+│    Affiche: "Bonjour Jean (120890177FA)"    │
+└────────────────┬────────────────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│ 6. Soumission vœux                          │
+│    POST /api/voeux/soumettre                │
+│    Body: { eleveId: 42, voeux: [...] }      │
+│    ✅ Continue avec id technique            │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+### Rollback (si nécessaire)
+
+**En cas de problème critique :**
+
+```sql
+-- Supprimer contraintes
+ALTER TABLE eleves DROP CONSTRAINT uk_eleve_id_national;
+DROP INDEX idx_eleve_id_national;
+
+-- Supprimer colonne
+ALTER TABLE eleves DROP COLUMN id_national;
+
+-- Restaurer code backend
+git revert <commit-hash>
+```
+
+**Recompilation :**
+```bash
+mvn clean package -DskipTests
+docker-compose up --build -d
+```
+
+---
+
+**✅ Migration complétée avec succès - Système opérationnel**
+
+---

@@ -1,0 +1,69 @@
+<div class="container">
+  <div class="card">
+    <div class="header">
+      <h1>📋 Récapitulatif de vos vœux</h1>
+      <p class="subtitle">Vérifiez vos choix avant la soumission finale</p>
+    </div>
+
+    <div *ngIf="loading" class="loading">
+      <div class="spinner"></div>
+      <p>Chargement de vos vœux...</p>
+    </div>
+
+    <div *ngIf="error" class="error-message">
+      {{ error }}
+    </div>
+
+    <div *ngIf="!loading && !error" class="content">
+      <div class="info-box">
+        <p>
+          <strong>⚠️ Important :</strong> Vérifiez attentivement vos choix. 
+          Une fois confirmés, vos vœux seront définitivement enregistrés.
+        </p>
+      </div>
+
+      <div class="voeux-list">
+        <div *ngFor="let voeu of voeux; let i = index" class="voeu-item">
+          <div class="voeu-header">
+            <span class="ordre-badge">Vœu n°{{ voeu.ordre }}</span>
+            <span class="type-badge" [class]="'type-' + getActivite(voeu.activiteId)?.type">
+              {{ getTypeLabel(getActivite(voeu.activiteId)?.type || '') }}
+            </span>
+          </div>
+          
+          <div class="voeu-content">
+            <h3 class="activite-titre">{{ getActivite(voeu.activiteId)?.titre }}</h3>
+            <p class="activite-description">{{ getActivite(voeu.activiteId)?.description }}</p>
+            
+            <div class="activite-details">
+              <span class="detail-item">
+                <span class="icon">👥</span>
+                Capacité : {{ getActivite(voeu.activiteId)?.capaciteMax }} places
+              </span>
+              <span class="detail-item">
+                <span class="icon">🕐</span>
+                {{ (getActivite(voeu.activiteId)?.demiJournee || '') | demiJourneeLabel }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-box warning">
+        <p>
+          <strong>💡 Besoin de modifier ?</strong> Cliquez sur "Modifier mes vœux" 
+          pour retourner au formulaire de saisie.
+        </p>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-secondary" (click)="modifier()">
+          ← Modifier mes vœux
+        </button>
+        <button class="btn btn-primary" (click)="confirmer()">
+          Confirmer et soumettre →
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,72 @@
+<div class="admin-dashboard">
+  <div class="dashboard-header">
+    <h1>Portail d'Administration</h1>
+    <span class="user-badge" *ngIf="isSuperAdmin">👑 SUPER ADMIN</span>
+    <button class="btn-logout" (click)="logout()">Déconnexion</button>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="card" (click)="navigateTo('import')">
+      <div class="card-icon">📁</div>
+      <h2>Import CSV</h2>
+      <p>Importer des élèves, activités ou salles</p>
+    </div>
+
+    <div class="card" (click)="navigateTo('eleves')">
+      <div class="card-icon">👨‍🎓</div>
+      <h2>Gestion Élèves</h2>
+      <p>Voir et gérer les élèves et leurs vœux</p>
+    </div>
+
+    <div class="card" (click)="navigateTo('activites')">
+      <div class="card-icon">🎯</div>
+      <h2>Gestion Activités</h2>
+      <p>CRUD des activités Forum FESUP</p>
+    </div>
+
+    <div class="card" (click)="navigateTo('salles')">
+      <div class="card-icon">🏢</div>
+      <h2>Gestion Salles</h2>
+      <p>CRUD des salles disponibles</p>
+    </div>
+
+    <div class="card" (click)="navigateTo('creneaux')">
+      <div class="card-icon">⏰</div>
+      <h2>Gestion Créneaux</h2>
+      <p>CRUD des créneaux horaires (4 demi-journées)</p>
+    </div>
+
+    <div class="card" (click)="navigateTo('lycees')">
+      <div class="card-icon">🏫</div>
+      <h2>Gestion Lycées</h2>
+      <p>CRUD des lycées participants</p>
+    </div>
+
+    <div class="card" (click)="navigateTo('sessions')">
+      <div class="card-icon">🗓️</div>
+      <h2>Gestion Sessions</h2>
+      <p>Définir activités par salle et créneau</p>
+    </div>
+
+    <div class="card" (click)="navigateTo('affectations')">
+      <div class="card-icon">🎯</div>
+      <h2>Affectations</h2>
+      <p>Algorithme d'optimisation des affectations</p>
+    </div>
+
+    <!-- Section SuperAdmin uniquement -->
+    <div class="card super-admin-card" *ngIf="isSuperAdmin" (click)="navigateTo('admin-management')">
+      <div class="card-icon">🔐</div>
+      <h2>Gestion Admins</h2>
+      <p>CRUD des administrateurs (SuperAdmin uniquement)</p>
+      <span class="super-badge">👑</span>
+    </div>
+
+    <div class="card super-admin-card" *ngIf="isSuperAdmin" (click)="navigateTo('system-settings')">
+      <div class="card-icon">⚙️</div>
+      <h2>Réglages Système</h2>
+      <p>Purge totale des données (SuperAdmin uniquement)</p>
+      <span class="super-badge">👑</span>
+    </div>
+  </div>
+</div>

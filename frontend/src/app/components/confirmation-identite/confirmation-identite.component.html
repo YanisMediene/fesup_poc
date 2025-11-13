@@ -1,0 +1,39 @@
+<div class="container">
+  <div class="card">
+    <h2>Confirmez votre identité</h2>
+    <p class="subtitle">Veuillez vérifier que ces informations correspondent bien à votre profil</p>
+    
+    <div class="carte-identite" *ngIf="eleve">
+      <div class="info-row">
+        <span class="label">Prénom :</span>
+        <span class="value">{{ eleve.prenom }}</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="label">Nom :</span>
+        <span class="value">{{ eleve.nom }}</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="label">Lycée :</span>
+        <span class="value">{{ eleve.lycee }}</span>
+      </div>
+      
+      <div class="info-row">
+        <span class="label">Demi-journée :</span>
+        <span class="value badge">{{ eleve.demiJournee | demiJourneeLabel }}</span>
+      </div>
+    </div>
+    
+    <p class="question">Est-ce bien vous ?</p>
+    
+    <div class="actions">
+      <button (click)="confirmer()" class="btn-primary">
+        ✓ Oui, c'est moi
+      </button>
+      <button (click)="retour()" class="btn-secondary">
+        ← Non, me réidentifier
+      </button>
+    </div>
+  </div>
+</div>

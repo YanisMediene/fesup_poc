@@ -1,0 +1,121 @@
+<div class="sessions-container">
+  <div class="header">
+    <button class="btn-back" routerLink="/admin/dashboard">
+      ← Retour au tableau de bord
+    </button>
+    <h1>🗓️ Gestion des Sessions</h1>
+    <button class="btn-delete-all" (click)="deleteAllSessions()" [disabled]="sessions.length === 0" title="Supprimer toutes les sessions">
+      🗑️ Supprimer Tout
+    </button>
+    <p class="subtitle">Définir les activités disponibles par salle et créneau</p>
+  </div>
+
+  <!-- Génération automatique -->
+  <div class="auto-gen-card">
+    <div class="auto-gen-content">
+      <div class="auto-gen-info">
+        <h3>🤖 Génération Automatique Intelligente</h3>
+        <p>Analysez les vœux des élèves et créez automatiquement les sessions nécessaires.</p>
+        <ul>
+          <li>✅ Les activités les plus demandées auront plus de sessions</li>
+          <li>✅ Optimisation pour satisfaire un maximum de vœux prioritaires (1 et 2)</li>
+          <li>✅ Répartition automatique sur les créneaux et salles disponibles</li>
+        </ul>
+      </div>
+      <button class="btn-auto-gen" (click)="genererSessionsAuto()" [disabled]="isGenerating">
+        <span *ngIf="!isGenerating">🚀 Générer les sessions automatiquement</span>
+        <span *ngIf="isGenerating">⏳ Génération en cours...</span>
+      </button>
+    </div>
+    <div class="auto-gen-result" *ngIf="generationResult">
+      <div class="result-success">
+        ✅ <strong>{{ generationResult.totalSessionsCreees }}</strong> sessions créées !
+        <span class="result-detail">({{ generationResult.anciennesSessions }} anciennes sessions supprimées)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Formulaire manuel -->
+  <div class="form-card">
+    <h2>{{ editMode ? '✏️ Modifier' : '➕ Créer Manuellement' }} une Session</h2>
+    <form [formGroup]="sessionForm" (ngSubmit)="onSubmit()">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Activité</label>
+          <select formControlName="activiteId" class="form-control">
+            <option value="">Sélectionner une activité</option>
+            <option *ngFor="let activite of activites" [value]="activite.id">
+              {{ activite.titre }} ({{ activite.type }})
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Salle</label>
+          <select formControlName="salleId" class="form-control">
+            <option value="">Sélectionner une salle</option>
+            <option *ngFor="let salle of salles" [value]="salle.id">
+              {{ salle.nom }} ({{ salle.capacite }} places)
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Créneau</label>
+          <select formControlName="creneauId" class="form-control">
+            <option value="">Sélectionner un créneau</option>
+            <option *ngFor="let creneau of creneaux" [value]="creneau.id">
+              {{ creneau.libelle }} ({{ creneau.demiJournee | demiJourneeLabel }})
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary" [disabled]="sessionForm.invalid">
+          {{ editMode ? 'Mettre à jour' : 'Créer' }}
+        </button>
+        <button type="button" class="btn-secondary" (click)="resetForm()" *ngIf="editMode">
+          Annuler
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Tableau des sessions -->
+  <div class="table-card">
+    <h2>📋 Sessions configurées ({{ sessions.length }})</h2>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Activité</th>
+            <th>Type</th>
+            <th>Salle</th>
+            <th>Créneau</th>
+            <th>Demi-journée</th>
+            <th>Capacité</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let session of sessions">
+            <td><strong>{{ session.activiteTitre }}</strong></td>
+            <td><span class="badge type-{{ session.activiteType }}">{{ session.activiteType }}</span></td>
+            <td>{{ session.salleNom }}</td>
+            <td>{{ session.creneauLibelle }}</td>
+            <td><span class="badge dj-{{ session.creneauDemiJournee }}">{{ (session.creneauDemiJournee || '') | demiJourneeLabel }}</span></td>
+            <td class="capacity">{{ session.capaciteDisponible }}</td>
+            <td class="actions">
+              <button class="btn-edit" (click)="editSession(session)" title="Modifier">✏️</button>
+              <button class="btn-delete" (click)="deleteSession(session.id!)" title="Supprimer">🗑️</button>
+            </td>
+          </tr>
+          <tr *ngIf="sessions.length === 0">
+            <td colspan="7" class="empty">Aucune session configurée</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

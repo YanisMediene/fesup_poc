@@ -1,0 +1,333 @@
+<div class="eleves-container">
+  <div class="header">
+    <button class="btn-back" (click)="goBack()">
+      <span class="icon">←</span> Retour
+    </button>
+    <h1>👨‍🎓 Gestion des Élèves</h1>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- Statistiques -->
+  <div class="stats-grid" *ngIf="stats">
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="stat-label">Total élèves</div>
+    </div>
+    <div class="stat-card success">
+      <div class="stat-icon">✅</div>
+      <div class="stat-value">{{ stats.avecVoeux }}</div>
+      <div class="stat-label">Vœux soumis</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-icon">⏳</div>
+      <div class="stat-value">{{ stats.sansVoeux }}</div>
+      <div class="stat-label">En attente</div>
+    </div>
+    <div class="stat-card info">
+      <div class="stat-icon">📊</div>
+      <div class="stat-value">{{ stats.tauxCompletion | number:'1.0-1' }}%</div>
+      <div class="stat-label">Taux de complétion</div>
+    </div>
+  </div>
+
+  <div class="error-message" *ngIf="error">
+    {{ error }}
+  </div>
+
+  <!-- Filtres et recherche -->
+  <div class="filters-bar">
+    <div class="filter-buttons">
+      <button 
+        class="filter-btn" 
+        [class.active]="filterStatus === 'all'"
+        (click)="setFilter('all')">
+        Tous ({{ eleves.length }})
+      </button>
+      <button 
+        class="filter-btn" 
+        [class.active]="filterStatus === 'with'"
+        (click)="setFilter('with')">
+        ✓ Avec vœux ({{ stats?.avecVoeux || 0 }})
+      </button>
+      <button 
+        class="filter-btn" 
+        [class.active]="filterStatus === 'without'"
+        (click)="setFilter('without')">
+        ⚠️ Sans vœux ({{ stats?.sansVoeux || 0 }})
+      </button>
+    </div>
+    
+    <div class="search-box">
+      <input 
+        type="text" 
+        placeholder="Rechercher (nom, prénom, lycée)..."
+        (input)="onSearchChange($event)"
+        [value]="searchTerm"
+      />
+    </div>
+
+    <button 
+      class="btn-add" 
+      (click)="openAddModal()"
+      [disabled]="loading"
+      title="Ajouter un élève">
+      ➕ Ajouter
+    </button>
+
+    <button 
+      class="btn-delete-all" 
+      (click)="deleteAllEleves()"
+      [disabled]="loading || eleves.length === 0"
+      title="Supprimer tous les élèves">
+      🗑️ Supprimer Tout
+    </button>
+  </div>
+
+  <!-- Liste des élèves -->
+  <div class="table-container">
+    <div class="loading" *ngIf="loading">Chargement...</div>
+    
+    <table *ngIf="!loading && filteredEleves.length > 0">
+      <thead>
+        <tr>
+          <th>Élève</th>
+          <th>Lycée</th>
+          <th>Demi-journée</th>
+          <th>Statut</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let eleve of filteredEleves">
+          <td>
+            <div class="eleve-name">
+              <strong>{{ eleve.prenom }} {{ eleve.nom }}</strong>
+              <small>ID National: {{ eleve.idNational }}</small>
+            </div>
+          </td>
+          <td>
+            <div class="lycee-info" *ngIf="eleve.lycee">
+              <strong>{{ eleve.lycee.nom }}</strong>
+              <small>{{ eleve.lycee.ville }} ({{ eleve.lycee.codePostal }})</small>
+            </div>
+          </td>
+          <td>
+            <span class="badge badge-time">
+              {{ eleve.demiJournee | demiJourneeLabel }}
+            </span>
+          </td>
+          <td>
+            <span class="badge" [ngClass]="getStatusBadgeClass(eleve)">
+              {{ getStatusText(eleve) }}
+            </span>
+          </td>
+          <td class="actions-cell">
+            <button class="btn-icon btn-view" (click)="viewDetails(eleve)" title="Voir détails">
+              👁️
+            </button>
+            <button 
+              class="btn-icon btn-reset" 
+              (click)="resetVoeux(eleve)" 
+              [disabled]="eleve.nbVoeux === 0"
+              title="Réinitialiser vœux">
+              🔄
+            </button>
+            <button class="btn-icon btn-delete" (click)="deleteEleve(eleve)" title="Supprimer">
+              🗑️
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="empty-state" *ngIf="!loading && filteredEleves.length === 0">
+      <p *ngIf="searchTerm || filterStatus !== 'all'">Aucun élève ne correspond aux filtres</p>
+      <p *ngIf="!searchTerm && filterStatus === 'all'">Aucun élève pour le moment</p>
+    </div>
+  </div>
+
+  <!-- Modal détails élève -->
+  <div class="modal" *ngIf="showDetails && selectedEleve">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📋 Détails de l'élève</h2>
+        <button class="btn-close" (click)="closeDetails()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="detail-section">
+          <h3>Informations personnelles</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>Nom complet</label>
+              <span>{{ selectedEleve.prenom }} {{ selectedEleve.nom }}</span>
+            </div>
+            <div class="detail-item">
+              <label>ID National</label>
+              <span>{{ selectedEleve.idNational }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Lycée</label>
+              <span *ngIf="selectedEleve.lycee">
+                {{ selectedEleve.lycee.nom }}<br/>
+                <small>{{ selectedEleve.lycee.ville }} ({{ selectedEleve.lycee.codePostal }})</small>
+              </span>
+            </div>
+            <div class="detail-item">
+              <label>Demi-journée</label>
+              <span>{{ selectedEleve.demiJournee | demiJourneeLabel }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h3>Statut des vœux</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>Statut</label>
+              <span class="badge" [ngClass]="getStatusBadgeClass(selectedEleve)">
+                {{ selectedEleve.voeuxSoumis ? 'Vœux soumis ✓' : 'En cours de saisie ⏳' }}
+              </span>
+            </div>
+            <div class="detail-item">
+              <label>Nombre de vœux</label>
+              <span>{{ selectedEleve.nbVoeux }} / 5</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedEleve.dateSoumission">
+              <label>Date de soumission</label>
+              <span>{{ selectedEleve.dateSoumission | date:'dd/MM/yyyy HH:mm' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section" *ngIf="selectedEleve.voeux && selectedEleve.voeux.length > 0">
+          <h3>Liste des vœux ({{ selectedEleve.voeux.length }})</h3>
+          <div class="voeux-list">
+            <div class="voeu-card" *ngFor="let voeu of selectedEleve.voeux">
+              <div class="voeu-priority">{{ voeu.priorite }}</div>
+              <div class="voeu-content">
+                <div class="voeu-title">{{ voeu.activite.titre }}</div>
+                <div class="voeu-meta">
+                  <span class="badge badge-type">{{ voeu.activite.type }}</span>
+                  <span class="badge badge-voeu-type">{{ voeu.typeVoeu }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section" *ngIf="!selectedEleve.voeux || selectedEleve.voeux.length === 0">
+          <p class="no-voeux">Aucun vœu enregistré pour cet élève</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button 
+          class="btn-secondary" 
+          (click)="resetVoeux(selectedEleve)"
+          [disabled]="selectedEleve.nbVoeux === 0">
+          🔄 Réinitialiser les vœux
+        </button>
+        <button class="btn-primary" (click)="closeDetails()">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Ajouter un élève -->
+  <div class="modal" *ngIf="showAddModal">
+    <div class="modal-content modal-form">
+      <div class="modal-header">
+        <h2>➕ Ajouter un élève</h2>
+        <button class="btn-close" (click)="closeAddModal()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="error-message" *ngIf="error">
+          {{ error }}
+        </div>
+
+        <form (ngSubmit)="createEleve()">
+          <div class="form-group">
+            <label for="nom">Nom <span class="required">*</span></label>
+            <input 
+              id="nom"
+              type="text" 
+              [(ngModel)]="newEleve.nom"
+              name="nom"
+              placeholder="NOM"
+              required
+              [disabled]="loading"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="prenom">Prénom <span class="required">*</span></label>
+            <input 
+              id="prenom"
+              type="text" 
+              [(ngModel)]="newEleve.prenom"
+              name="prenom"
+              placeholder="Prénom"
+              required
+              [disabled]="loading"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="lycee">Lycée <span class="required">*</span></label>
+            <select 
+              id="lycee"
+              [(ngModel)]="newEleve.lyceeId"
+              name="lyceeId"
+              required
+              [disabled]="loading || lycees.length === 0"
+            >
+              <option [value]="0" disabled>-- Sélectionner un lycée --</option>
+              <option *ngFor="let lycee of lycees" [value]="lycee.id">
+                {{ lycee.nom }} - {{ lycee.ville }}
+              </option>
+            </select>
+            <small *ngIf="lycees.length === 0" class="warning-text">
+              ⚠️ Aucun lycée disponible. Veuillez d'abord créer des lycées.
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label for="demiJournee">Demi-journée <span class="required">*</span></label>
+            <select 
+              id="demiJournee"
+              [(ngModel)]="newEleve.demiJournee"
+              name="demiJournee"
+              required
+              [disabled]="loading"
+            >
+              <option value="JOUR1_MATIN">📅 Jour 1 - 🌅 Matin</option>
+              <option value="JOUR1_APRES_MIDI">📅 Jour 1 - 🌆 Après-midi</option>
+              <option value="JOUR2_MATIN">📅 Jour 2 - 🌅 Matin</option>
+              <option value="JOUR2_APRES_MIDI">📅 Jour 2 - 🌆 Après-midi</option>
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button 
+              type="button" 
+              class="btn-secondary" 
+              (click)="closeAddModal()"
+              [disabled]="loading">
+              Annuler
+            </button>
+            <button 
+              type="submit" 
+              class="btn-primary" 
+              [disabled]="loading || lycees.length === 0">
+              {{ loading ? 'Création...' : '✓ Créer l\'élève' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

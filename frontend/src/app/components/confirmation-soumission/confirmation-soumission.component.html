@@ -1,0 +1,71 @@
+<div class="container">
+  <div class="card">
+    <div class="success-icon">✅</div>
+    
+    <h2>Vos vœux ont été enregistrés !</h2>
+    
+    <div class="message" *ngIf="eleve">
+      <p class="main-text">
+        Merci <strong>{{ eleve.prenom }}</strong>, vos vœux ont été soumis avec succès.
+      </p>
+      <p class="secondary-text">
+        Vous ne pouvez plus modifier vos choix.
+      </p>
+    </div>
+    
+    <div class="info-soumission">
+      <div class="info-row">
+        <span class="label">📅 Date de soumission :</span>
+        <span class="value">{{ dateSoumission | date:'dd/MM/yyyy à HH:mm' }}</span>
+      </div>
+    </div>
+    
+    <!-- Section Téléchargement du Planning -->
+    <div class="planning-section" *ngIf="!isCheckingTicket">
+      <div class="alert alert-success" *ngIf="ticketDisponible">
+        <div class="alert-icon">📄</div>
+        <div class="alert-content">
+          <h4>Votre planning est disponible !</h4>
+          <p>Téléchargez votre planning personnalisé des conférences FESUP 2025.</p>
+          <button 
+            class="btn-download" 
+            (click)="telechargerMonPlanning()"
+            [disabled]="isLoadingTicket">
+            <span *ngIf="!isLoadingTicket">
+              <i class="icon-download">⬇️</i> Télécharger mon planning (PDF)
+            </span>
+            <span *ngIf="isLoadingTicket">
+              <span class="spinner"></span> Téléchargement en cours...
+            </span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="alert alert-info" *ngIf="!ticketDisponible">
+        <div class="alert-icon">ℹ️</div>
+        <div class="alert-content">
+          <p>Votre planning n'est pas encore disponible.</p>
+          <p class="small-text">Il sera généré prochainement par l'administration.</p>
+        </div>
+      </div>
+    </div>
+    
+    <div class="loading-section" *ngIf="isCheckingTicket">
+      <span class="spinner"></span>
+      <p>Vérification de la disponibilité du planning...</p>
+    </div>
+    
+    <div class="next-steps">
+      <h3>📋 Prochaines étapes</h3>
+      <ul>
+        <li>Vous recevrez une notification pour confirmer l'affectation de vos activités</li>
+        <li>Les résultats seront disponibles prochainement</li>
+        <li>Consultez régulièrement votre messagerie</li>
+      </ul>
+    </div>
+    
+    <button (click)="fermer()" class="btn-primary">
+      Terminer
+    </button>
+  </div>
+</div>

@@ -1,0 +1,147 @@
+<div class="activites-container">
+  <div class="header">
+    <button class="btn-back" (click)="goBack()">
+      <span class="icon">←</span> Retour
+    </button>
+    <h1>🎯 Gestion des Activités</h1>
+    <div class="header-actions">
+      <button class="btn-delete-all" (click)="deleteAllActivites()" [disabled]="loading || activites.length === 0" title="Supprimer toutes les activités">
+        🗑️ Supprimer Tout
+      </button>
+      <button class="btn-primary" (click)="openCreateForm()" *ngIf="!showForm">
+        + Nouvelle Activité
+      </button>
+    </div>
+  </div>
+
+  <div class="error-message" *ngIf="error">
+    {{ error }}
+  </div>
+
+  <!-- Formulaire de création/édition -->
+  <div class="form-modal" *ngIf="showForm">
+    <div class="form-container">
+      <h2>{{ editingId ? 'Modifier l\'activité' : 'Nouvelle activité' }}</h2>
+      
+      <form [formGroup]="activiteForm" (ngSubmit)="onSubmit()">
+        <div class="form-group">
+          <label for="titre">Titre de l'activité *</label>
+          <input
+            id="titre"
+            type="text"
+            formControlName="titre"
+            placeholder="Ex: Présentation du métier d'ingénieur"
+          />
+          <div class="error" *ngIf="activiteForm.get('titre')?.invalid && activiteForm.get('titre')?.touched">
+            <span *ngIf="activiteForm.get('titre')?.errors?.['required']">Le titre est requis</span>
+            <span *ngIf="activiteForm.get('titre')?.errors?.['minlength']">Le titre doit contenir au moins 3 caractères</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description *</label>
+          <textarea
+            id="description"
+            formControlName="description"
+            rows="4"
+            placeholder="Décrivez l'activité..."
+          ></textarea>
+          <div class="error" *ngIf="activiteForm.get('description')?.invalid && activiteForm.get('description')?.touched">
+            La description est requise
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="type">Type d'activité *</label>
+            <select id="type" formControlName="type">
+              <option [value]="type" *ngFor="let type of typesActivite">{{ type }}</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="demiJournee">Demi-journée *</label>
+            <select id="demiJournee" formControlName="demiJournee">
+              <option [value]="dj.value" *ngFor="let dj of demiJournees">
+                {{ dj.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="capaciteMax">Capacité max *</label>
+            <input
+              id="capaciteMax"
+              type="number"
+              formControlName="capaciteMax"
+              min="1"
+              placeholder="30"
+            />
+            <div class="error" *ngIf="activiteForm.get('capaciteMax')?.invalid && activiteForm.get('capaciteMax')?.touched">
+              La capacité doit être > 0
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" (click)="closeForm()" [disabled]="loading">
+            Annuler
+          </button>
+          <button type="submit" class="btn-primary" [disabled]="loading || activiteForm.invalid">
+            {{ loading ? 'Enregistrement...' : (editingId ? 'Modifier' : 'Créer') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Liste des activités -->
+  <div class="table-container" *ngIf="!showForm">
+    <div class="loading" *ngIf="loading">Chargement...</div>
+    
+    <table *ngIf="!loading && activites.length > 0">
+      <thead>
+        <tr>
+          <th>Titre</th>
+          <th>Type</th>
+          <th>Demi-journée</th>
+          <th>Capacité</th>
+          <th>Description</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let activite of activites">
+          <td><strong>{{ activite.titre }}</strong></td>
+          <td>
+            <span class="badge" [ngClass]="getTypeBadgeClass(activite.type)">
+              {{ activite.type }}
+            </span>
+          </td>
+          <td>
+            <span class="badge badge-time">
+              {{ activite.demiJournee | demiJourneeLabel }}
+            </span>
+          </td>
+          <td>{{ activite.capaciteMax }} places</td>
+          <td class="description-cell">{{ activite.description }}</td>
+          <td class="actions-cell">
+            <button class="btn-icon btn-edit" (click)="openEditForm(activite)" title="Modifier">
+              ✏️
+            </button>
+            <button class="btn-icon btn-delete" (click)="deleteActivite(activite.id!, activite.titre)" title="Supprimer">
+              🗑️
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="empty-state" *ngIf="!loading && activites.length === 0">
+      <p>Aucune activité pour le moment</p>
+      <button class="btn-primary" (click)="openCreateForm()">
+        Créer la première activité
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,16 @@
+nom,capacite,batiment,equipements
+Amphithéâtre A,150,Bâtiment Principal,Vidéoprojecteur 4K Sono Micro HF Écran géant
+Amphithéâtre B,120,Bâtiment Principal,Vidéoprojecteur Sono Écran motorisé
+Salle 101,40,Bâtiment A,Tableau blanc Vidéoprojecteur WiFi
+Salle 102,40,Bâtiment A,Tableau blanc Vidéoprojecteur WiFi Écran tactile
+Salle 103,30,Bâtiment A,Tableau blanc Vidéoprojecteur WiFi
+Salle 201,50,Bâtiment B,Vidéoprojecteur 4K Sono Écrans multiples
+Salle 202,45,Bâtiment B,Vidéoprojecteur Sono Tableau interactif
+Salle 203,35,Bâtiment B,Vidéoprojecteur WiFi Tableau blanc
+Lab Informatique 1,30,Bâtiment C,30 PC Vidéoprojecteur Imprimante 3D
+Lab Informatique 2,25,Bâtiment C,25 PC Vidéoprojecteur Casques VR
+Salle Polyvalente,80,Bâtiment D,Sono Vidéoprojecteur Tables modulables Écran LED
+Salle de Conférence,60,Bâtiment D,Vidéoprojecteur 4K Sono Visioconférence Micro HF
+Atelier Robotique,25,Bâtiment E,Robots 10 PC Imprimante 3D Outils électronique
+Studio Multimédia,20,Bâtiment E,Caméras Micros Studio Éclairage Fond vert
+Salle Innovation,35,Bâtiment F,Tableaux blancs Vidéoprojecteur WiFi Mobilier modulable

@@ -1,0 +1,54 @@
+===========================================
+CONFIGURATION PGADMIN 4 - FESUP DATABASE
+===========================================
+
+1. Lancez pgAdmin 4
+
+2. Clic droit sur "Servers" → "Register" → "Server..."
+
+3. Onglet "General" :
+   - Name: FESUP POC
+
+4. Onglet "Connection" :
+   - Host name/address: localhost
+   - Port: 5433
+   - Maintenance database: fesup_db
+   - Username: postgres
+   - Password: postgres
+   - Save password: ✓ (cocher)
+
+5. Cliquez sur "Save"
+
+===========================================
+STRUCTURE DE LA BASE
+===========================================
+
+Tables disponibles :
+• eleves (5 élèves de test)
+• activites (58 activités : 19 conférences + 5 tables rondes + 5 flashs métiers × 2)
+• voeux (vide pour l'instant, sera rempli lors de la soumission)
+
+===========================================
+REQUÊTES UTILES
+===========================================
+
+-- Voir tous les élèves
+SELECT * FROM eleves;
+
+-- Voir toutes les activités du MATIN
+SELECT * FROM activites WHERE demi_journee = 'MATIN';
+
+-- Compter les activités par type et demi-journée
+SELECT type, demi_journee, COUNT(*) 
+FROM activites 
+GROUP BY type, demi_journee 
+ORDER BY demi_journee, type;
+
+-- Voir les vœux soumis (si des élèves ont déjà soumis)
+SELECT e.nom, e.prenom, a.titre, v.priorite, v.type_voeu
+FROM voeux v
+JOIN eleves e ON v.eleve_id = e.id
+JOIN activites a ON v.activite_id = a.id
+ORDER BY e.nom, v.priorite;
+
+===========================================
