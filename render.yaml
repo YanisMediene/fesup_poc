@@ -76,3 +76,7 @@ services:
     rewrites:
       - source: /api/:path*
         destination: https://fesup-backend.onrender.com/api/:path*
+
+    envVars:
+      - key: BACKEND_URL
+        value: https://fesup-backend.onrender.com
