@@ -6,7 +6,6 @@ services:
     name: fesup-postgres
     plan: free
     region: frankfurt
-    ipAllowList: []
 
   # ============================================
   # Backend Spring Boot
