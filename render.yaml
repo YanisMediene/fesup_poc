@@ -7,6 +7,10 @@ databases:
     region: frankfurt
 
 services:
+  # ============================================
+  # Backend Spring Boot
+  # ============================================
+  - type: web
     name: fesup-backend
     env: docker
     plan: free
