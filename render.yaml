@@ -3,18 +3,15 @@
 # Déploiement automatique : PostgreSQL + Backend + Frontend
 # ============================================
 
-services:
-  # ========== SERVICE 1 : BASE DE DONNÉES POSTGRESQL ==========
-  - type: pserv
-    name: fesup-postgres
+databases:
+  # ========== BASE DE DONNÉES POSTGRESQL ==========
+  - name: fesup-postgres
+    databaseName: fesup_postgres
+    user: fesup_user
     plan: free
     region: frankfurt
-    databases:
-      - name: fesup_db
-        databaseName: fesup_db
-        user: fesup_user
 
-  # ========== SERVICE 2 : BACKEND (SPRING BOOT) ==========
+services:
   - type: web
     name: fesup-backend
     env: docker
