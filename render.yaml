@@ -44,7 +44,7 @@ services:
         fromService:
           type: web
           name: fesup-frontend
-          property: hostAndPort
+          property: host
       
       # Stockage tickets (database pour éviter perte de données)
       - key: TICKETS_STORAGE_TYPE
