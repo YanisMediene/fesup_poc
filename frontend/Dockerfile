@@ -35,15 +35,26 @@ RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/default.conf
 # Copier les fichiers buildés depuis l'étape de build
 COPY --from=build /app/dist/fesup-voeux-frontend /usr/share/nginx/html
 
-# Copier la configuration Nginx personnalisée
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copier le template Nginx (avec variables à injecter)
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
 
-# Exposer le port 80
+# Copier l'ancien nginx.conf pour compatibilité Docker Compose local
+COPY nginx.conf /etc/nginx/conf.d/default.conf.backup
+
+# Copier le script de démarrage pour Render
+COPY start-nginx.sh /start-nginx.sh
+RUN chmod +x /start-nginx.sh
+
+# Installer gettext pour envsubst (substitution de variables)
+RUN apk add --no-cache gettext
+
+# Exposer le port dynamique (80 local, 10000 Render)
 EXPOSE 80
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80 || exit 1
+# Healthcheck - port dynamique pour Render
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-80}/health || exit 1
 
-# Démarrer Nginx (au premier plan)
-CMD ["nginx", "-g", "daemon off;"]
+# Démarrer via script pour Render (injection variables)
+# Pour Docker Compose local, utiliser: docker-compose.yml avec command override
+CMD ["/start-nginx.sh"]

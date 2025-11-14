@@ -47,16 +47,16 @@ RUN chown -R spring:spring /app
 # Passer à l'utilisateur non-root
 USER spring:spring
 
-# Exposer le port 8080
+# Exposer le port dynamique (8080 local, 10000 Render)
 EXPOSE 8080
 
-# Variables d'environnement par défaut (seront override par docker-compose)
+# Variables d'environnement par défaut
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
-# Point de santé (healthcheck)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+# Point de santé (healthcheck) - port dynamique pour Render
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/api/actuator/health || exit 1
 
-# Commande de démarrage
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+# Commande de démarrage avec port dynamique
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT:-8080} -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-prod} -jar app.jar"]

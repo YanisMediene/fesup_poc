@@ -1,82 +1,89 @@
-# ===================================================================
-# Fichier de configuration pour le déploiement sur Render.com
-# Inspiré du docker-compose.yml
-# ===================================================================
+# ============================================
+# Render.com Blueprint - Application FESUP
+# Déploiement automatique : PostgreSQL + Backend + Frontend
+# ============================================
 
 services:
   # ========== SERVICE 1 : BASE DE DONNÉES POSTGRESQL ==========
-  - type: psql
-    name: fesup-db
+  - type: pserv
+    name: fesup-postgres
+    plan: free
     region: frankfurt
-    plan: free # Choisissez un plan adapté à vos besoins
-    postgresMajorVersion: 16
-    disk:
-      name: fesup-postgres-data
-      sizeGB: 1
-      mountPath: /var/lib/postgresql/data
+    databases:
+      - name: fesup_db
+        databaseName: fesup_db
+        user: fesup_user
 
   # ========== SERVICE 2 : BACKEND (SPRING BOOT) ==========
   - type: web
     name: fesup-backend
-    region: frankfurt
-    plan: free # Choisissez un plan adapté à vos besoins
     env: docker
+    plan: free
+    region: frankfurt
+    branch: main
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    healthCheck:
-      path: /actuator/health
-      initialDelaySeconds: 60
+    
     envVars:
+      # Configuration Spring Boot
       - key: SPRING_PROFILES_ACTIVE
         value: prod
-      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
-        value: update
-      - key: SPRING_JPA_SHOW_SQL
-        value: false
-      # Connexion à la base de données (injectée par Render)
-      - fromService:
-          type: psql
-          name: fesup-db
-          envVarKey: SPRING_DATASOURCE_URL
-      - fromService:
-          type: psql
-          name: fesup-db
-          envVarKey: SPRING_DATASOURCE_USERNAME
-      - fromService:
-          type: psql
-          name: fesup-db
-          envVarKey: SPRING_DATASOURCE_PASSWORD
-      # Configuration du stockage des tickets
-      - key: APPLICATION_TICKETS_STORAGE_PATH
-        value: /app/tickets
-      # Configuration JVM
+      
+      # URL base de données (injectée automatiquement par Render)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fesup-postgres
+          property: connectionString
+      
+      # Port dynamique Render (configuré automatiquement)
+      - key: PORT
+        value: "10000"
+      
+      # Options JVM optimisées pour 512MB RAM
       - key: JAVA_OPTS
-        value: -Xmx512m -Xms256m -XX:+UseG1GC
-    disk:
-      name: fesup-tickets-storage
-      sizeGB: 1
-      mountPath: /app/tickets
+        value: "-Xmx450m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=80.0"
+      
+      # URL frontend pour CORS (sera mise à jour automatiquement)
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: fesup-frontend
+          property: hostAndPort
+      
+      # Stockage tickets (database pour éviter perte de données)
+      - key: TICKETS_STORAGE_TYPE
+        value: database
+    
+    # Health check endpoint
+    healthCheckPath: /api/actuator/health
+    
+    # Auto-deploy à chaque push sur main
+    autoDeploy: true
 
   # ========== SERVICE 3 : FRONTEND (ANGULAR + NGINX) ==========
   - type: web
     name: fesup-frontend
-    region: frankfurt
-    plan: free # Choisissez un plan adapté à vos besoins
     env: docker
+    plan: free
+    region: frankfurt
+    branch: main
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
-    healthCheck:
-      path: /
-      initialDelaySeconds: 30
-    routes:
-      - type: rewrite
-        source: /api/*
-        destination: /api/*
-    # Redirection des requêtes /api/* vers le backend
-    rewrites:
-      - source: /api/:path*
-        destination: https://fesup-backend.onrender.com/api/:path*
-
+    
     envVars:
+      # URL backend (injectée automatiquement par Render)
       - key: BACKEND_URL
-        value: https://fesup-backend.onrender.com
+        fromService:
+          type: web
+          name: fesup-backend
+          envVarKey: RENDER_EXTERNAL_URL
+      
+      # Port dynamique Render
+      - key: PORT
+        value: "10000"
+    
+    # Health check endpoint
+    healthCheckPath: /health
+    
+    # Auto-deploy à chaque push sur main
+    autoDeploy: true
