@@ -17,6 +17,10 @@ if [ -z "$BACKEND_URL" ]; then
     export BACKEND_URL="http://localhost:8080"
 else
     echo "✅ BACKEND_URL détectée: $BACKEND_URL"
+    # Nettoyer l'URL - supprimer https:// ou http:// si présent
+    # Render peut fournir "https://fesup-backend.onrender.com" ou "fesup-backend.onrender.com"
+    export BACKEND_URL=$(echo "$BACKEND_URL" | sed -e 's|^https\?://||')
+    echo "🔧 BACKEND_URL nettoyée: $BACKEND_URL"
 fi
 
 echo "📝 Configuration Nginx:"

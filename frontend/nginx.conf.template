@@ -62,9 +62,13 @@ http {
         # Toutes les requêtes vers /api/** sont redirigées vers le backend Spring Boot
         location /api/ {
             # URL backend dynamique (variable ${BACKEND_URL} injectée)
-            # Format attendu: https://fesup-backend.onrender.com
-            proxy_pass https://${BACKEND_URL}/api/;
+            # Render fournit juste le hostname, on ajoute https:// ici
+            proxy_pass https://${BACKEND_URL};
             proxy_http_version 1.1;
+            
+            # IMPORTANT: Configurer SSL pour proxy HTTPS
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
             
             # Headers pour le proxy
             proxy_set_header Host $host;
