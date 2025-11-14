@@ -35,9 +35,8 @@ services:
           name: fesup-postgres
           property: connectionString
       
-      # Port dynamique Render (configuré automatiquement)
-      - key: PORT
-        value: "10000"
+      # Port dynamique Render (injecté automatiquement par la plateforme)
+      # Pas besoin de définir PORT - Render l'injecte automatiquement
       
       # Options JVM optimisées pour 512MB RAM
       - key: JAVA_OPTS
@@ -76,11 +75,10 @@ services:
         fromService:
           type: web
           name: fesup-backend
-          envVarKey: RENDER_EXTERNAL_URL
+          property: host
       
-      # Port dynamique Render
-      - key: PORT
-        value: "10000"
+      # Port dynamique Render (injecté automatiquement par la plateforme)
+      # Pas besoin de définir PORT - Render l'injecte automatiquement
     
     # Health check endpoint
     healthCheckPath: /health
